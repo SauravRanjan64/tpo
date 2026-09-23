@@ -6,15 +6,21 @@ import cookieParser from 'cookie-parser';
 
 const app = express();
 const server = http.createServer(app);
+
+// Build allowed origins from env var (comma-separated) with sensible defaults
+const allowedOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
+  : ['http://localhost:5173', 'http://localhost:3000', 'https://placement-dcrust.vercel.app'];
+
 const io = new Server(server, {
   cors: {
-    origin: ['http://localhost:5173', 'http://localhost:3000'],
+    origin: allowedOrigins,
     credentials: true,
   },
 });
 
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:3000'],
+  origin: allowedOrigins,
   credentials: true,
 }));
 
@@ -214,7 +220,7 @@ app.post('/api/auth/login', (req, res) => {
   res.cookie('placement_session', JSON.stringify(user), {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
     maxAge: 7 * 24 * 60 * 60 * 1000
   });
 
@@ -222,7 +228,11 @@ app.post('/api/auth/login', (req, res) => {
 });
 
 app.post('/api/auth/logout', (req, res) => {
-  res.clearCookie('placement_session');
+  res.clearCookie('placement_session', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+  });
   res.json({ message: 'Logged out successfully' });
 });
 
@@ -241,7 +251,8 @@ app.post('/api/auth/consent', (req, res) => {
 
   res.cookie('placement_session', JSON.stringify(user), {
     httpOnly: true,
-    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
     maxAge: 7 * 24 * 60 * 60 * 1000
   });
 
