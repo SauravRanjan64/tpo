@@ -11,6 +11,15 @@ export const axiosClient = axios.create({
   },
 });
 
+// Attach JWT token from localStorage for reliable cross-domain authentication
+axiosClient.interceptors.request.use((config) => {
+  const token = localStorage.getItem('dcrust_token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 // If USE_MOCK is enabled, intercept calls through the in-browser mock router
 if (useMockTransport) {
   axiosClient.interceptors.request.use(async (config) => {

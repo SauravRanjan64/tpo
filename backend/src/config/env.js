@@ -16,7 +16,7 @@ const envSchema = z.object({
   JWT_SECRET: z.string().default('super_secret_jwt_key_for_dcrust_placement_system_2026'),
   JWT_EXPIRES_IN: z.string().default('7d'),
   COOKIE_NAME: z.string().default('dcrust_auth_token'),
-  CORS_ORIGIN: z.string().default('http://localhost:5173,http://localhost:3000'),
+  CORS_ORIGIN: z.string().default('http://localhost:5173,http://localhost:3000,https://placement-dcrust.vercel.app'),
   STORAGE_UPLOAD_DIR: z.string().default('./uploads'),
   REDIS_URL: z.string().default('redis://localhost:6379'),
 });

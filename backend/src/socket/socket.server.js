@@ -7,11 +7,20 @@ import logger from '../config/logger.js';
 let io = null;
 
 export function initializeSocket(httpServer) {
-  const allowedOrigins = env.CORS_ORIGIN.split(',').map(s => s.trim());
+  const configuredOrigins = env.CORS_ORIGIN.split(',').map(s => s.trim().replace(/\/$/, ''));
+  const defaultOrigins = ['http://localhost:5173', 'http://localhost:3000', 'https://placement-dcrust.vercel.app'];
+  const allowedOrigins = Array.from(new Set([...configuredOrigins, ...defaultOrigins]));
 
   io = new Server(httpServer, {
     cors: {
-      origin: allowedOrigins,
+      origin: (origin, callback) => {
+        if (!origin) return callback(null, true);
+        const cleanOrigin = origin.replace(/\/$/, '');
+        if (allowedOrigins.includes(cleanOrigin) || cleanOrigin.endsWith('.vercel.app')) {
+          return callback(null, true);
+        }
+        return callback(new Error(`Socket origin not allowed: ${origin}`));
+      },
       credentials: true,
     },
   });

@@ -39,6 +39,9 @@ export const AuthProvider = ({ children }) => {
       setIsLoading(true);
       const res = await authApi.login(email, password);
       if (res?.user) {
+        if (res?.token) {
+          localStorage.setItem('dcrust_token', res.token);
+        }
         setUser(res.user);
         setRole(res.user.role);
         showToast({
@@ -64,6 +67,7 @@ export const AuthProvider = ({ children }) => {
     } catch (err) {
       console.warn('Logout request failed', err);
     } finally {
+      localStorage.removeItem('dcrust_token');
       setUser(null);
       setRole(null);
       showToast({ type: 'info', title: 'Logged Out', message: 'You have been safely signed out.' });

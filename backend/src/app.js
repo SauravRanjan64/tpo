@@ -11,6 +11,7 @@ import routes from './routes/index.js';
 
 export function createApp() {
   const app = express();
+  app.set('trust proxy', 1);
 
   // 1. Security Headers
   app.use(helmet({
@@ -19,14 +20,19 @@ export function createApp() {
   }));
 
   // 2. CORS
-  const allowedOrigins = env.CORS_ORIGIN.split(',').map(s => s.trim());
+  const configuredOrigins = env.CORS_ORIGIN.split(',').map(s => s.trim().replace(/\/$/, ''));
+  const defaultOrigins = ['http://localhost:5173', 'http://localhost:3000', 'https://placement-dcrust.vercel.app'];
+  const allowedOrigins = Array.from(new Set([...configuredOrigins, ...defaultOrigins]));
+
   app.use(cors({
     origin: (origin, callback) => {
       // Allow requests with no origin (e.g., mobile apps, curl, server-to-server)
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (!origin) return callback(null, true);
+      const cleanOrigin = origin.replace(/\/$/, '');
+      if (allowedOrigins.includes(cleanOrigin) || cleanOrigin.endsWith('.vercel.app')) {
         return callback(null, true);
       }
-      return callback(new Error('Origin is not allowed by CORS policy'));
+      return callback(new Error(`Origin ${origin} is not allowed by CORS policy`));
     },
     credentials: true,
   }));

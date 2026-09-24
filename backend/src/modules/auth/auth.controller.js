@@ -31,6 +31,7 @@ export class AuthController {
         'Authentication successful.',
         {
           user: result.user,
+          token: result.token,
         },
         200
       );
@@ -77,7 +78,7 @@ export class AuthController {
       const token = AuthService.generateToken(user);
       res.cookie(env.COOKIE_NAME, token, AuthService.getCookieOptions());
 
-      return ApiResponse.success(res, 'Session refreshed successfully.', { user });
+      return ApiResponse.success(res, 'Session refreshed successfully.', { user, token });
     } catch (err) {
       next(err);
     }

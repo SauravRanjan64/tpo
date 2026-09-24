@@ -513,6 +513,75 @@ app.patch('/api/notifications/read-all', (req, res) => {
   res.json({ success: true });
 });
 
+app.patch('/api/notifications/:id/read', (req, res) => {
+  notifications = notifications.map(n =>
+    n.id === req.params.id ? { ...n, read: true } : n
+  );
+  res.json({ success: true });
+});
+
+// --- ADMIN ROUTES ---
+app.get('/api/admin/stats', (req, res) => {
+  res.json({
+    totalStudents: students.length,
+    totalCompanies: companies.length,
+    activeDrives: drives.filter(d => d.status === 'ACTIVE').length,
+    totalApplications: applications.length,
+    shortlisted: applications.filter(a => a.status === 'SHORTLISTED').length,
+    selected: applications.filter(a => a.status === 'SELECTED').length,
+  });
+});
+
+app.get('/api/admin/students', (req, res) => {
+  res.json({ students, total: students.length });
+});
+
+app.get('/api/admin/companies', (req, res) => {
+  res.json({ companies, total: companies.length });
+});
+
+app.patch('/api/admin/companies/:id/verify', (req, res) => {
+  companies = companies.map(c => c.id === req.params.id ? { ...c, verified: true } : c);
+  const comp = companies.find(c => c.id === req.params.id);
+  res.json({ company: comp });
+});
+
+app.get('/api/admin/jobs', (req, res) => {
+  res.json({ jobs: drives, total: drives.length });
+});
+
+app.post('/api/admin/jobs', (req, res) => {
+  const newDrive = { id: `job-${Date.now()}`, ...req.body, status: 'ACTIVE' };
+  drives.unshift(newDrive);
+  res.status(201).json({ job: newDrive });
+});
+
+app.get('/api/admin/applications', (req, res) => {
+  const enriched = applications.map(a => {
+    const s = students.find(st => st.id === a.studentId) || {};
+    const j = drives.find(d => d.id === a.jobId) || {};
+    return { ...a, studentName: s.name, branch: s.branch, cgpa: s.cgpa, jobTitle: j.title, companyName: j.companyName };
+  });
+  res.json({ applications: enriched, total: enriched.length });
+});
+
+app.get('/api/admin/audit', (req, res) => {
+  res.json({ logs: auditLogs });
+});
+
+app.get('/api/admin/exports/csv', (req, res) => {
+  const headers = ['id', 'studentName', 'branch', 'cgpa', 'jobTitle', 'companyName', 'status', 'appliedOn'];
+  const rows = applications.map(a => {
+    const s = students.find(st => st.id === a.studentId) || {};
+    const j = drives.find(d => d.id === a.jobId) || {};
+    return [a.id, s.name, s.branch, s.cgpa, j.title, j.companyName, a.status, a.appliedOn].join(',');
+  });
+  const csv = [headers.join(','), ...rows].join('\n');
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename=applications.csv');
+  res.send(csv);
+});
+
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log(`DCRUST Placement Backend running on http://localhost:${PORT}`);

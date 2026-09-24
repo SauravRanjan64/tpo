@@ -25,7 +25,9 @@ export const SocketProvider = ({ children }) => {
       try {
         // Socket.io connects to the server root, not the /api path
         const serverRoot = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/api$/, '');
+        const token = localStorage.getItem('dcrust_token');
         socket = io(serverRoot, {
+          auth: { token },
           withCredentials: true,
           transports: ['websocket', 'polling'],
         });
