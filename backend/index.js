@@ -194,7 +194,7 @@ app.post('/api/auth/login', (req, res) => {
   const { email, role } = req.body;
   let user = null;
 
-  if (email === 'admin@dcrust.ac.in' || role === 'ADMIN') {
+  if (email === 'admin@dcrust.ac.in' || email === 'admin@dcrust.edu.in' || role === 'ADMIN') {
     user = {
       id: 'admin-1',
       name: 'Dr. R. K. Sehrawat',

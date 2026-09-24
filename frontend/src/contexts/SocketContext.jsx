@@ -23,7 +23,9 @@ export const SocketProvider = ({ children }) => {
     let socket = null;
     if (!useMockTransport) {
       try {
-        socket = io(import.meta.env.VITE_API_URL || 'http://localhost:5000', {
+        // Socket.io connects to the server root, not the /api path
+        const serverRoot = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/api$/, '');
+        socket = io(serverRoot, {
           withCredentials: true,
           transports: ['websocket', 'polling'],
         });
