@@ -26,7 +26,16 @@ export const AdminDashboard = () => {
     queryFn: () => adminApi.getStats(),
   });
 
-  const stats = data || {};
+  const rawStats = data?.stats || data || {};
+  const stats = {
+    ...rawStats,
+    totalStudents: rawStats.totalStudents || 0,
+    activeCompanies: rawStats.activeCompanies ?? rawStats.totalCompanies ?? 0,
+    activeDrives: rawStats.activeDrives ?? rawStats.activeJobDrives ?? 0,
+    totalApplications: rawStats.totalApplications || 0,
+    shortlisted: rawStats.shortlisted ?? rawStats.shortlistedCount ?? 0,
+    selected: rawStats.selected ?? rawStats.selectedCount ?? 0,
+  };
 
   if (isLoading) return <DashboardSkeleton />;
   if (error) {

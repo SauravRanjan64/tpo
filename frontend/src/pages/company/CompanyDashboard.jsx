@@ -23,7 +23,7 @@ export const CompanyDashboard = () => {
     queryFn: () => companyApi.getStats(),
   });
 
-  const stats = data || {};
+  const stats = data?.stats || data || {};
 
   if (isLoading) return <DashboardSkeleton />;
   if (error) {

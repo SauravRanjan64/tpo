@@ -32,7 +32,13 @@ export const StudentDashboard = () => {
     queryFn: () => jobApi.getJobs({ limit: 5 }),
   });
 
-  const stats = statsData || { availableJobs: 0, myApplications: 0, shortlisted: 0, selected: 0 };
+  const rawStats = statsData?.stats || statsData || {};
+  const stats = {
+    availableJobs: rawStats.activeDrivesCount ?? rawStats.availableJobs ?? 0,
+    myApplications: rawStats.totalApplied ?? rawStats.myApplications ?? 0,
+    shortlisted: rawStats.shortlisted ?? 0,
+    selected: rawStats.selected ?? 0,
+  };
   const jobs = jobsData?.jobs || [];
 
   if (statsLoading || jobsLoading) {
