@@ -16,7 +16,7 @@ export function initializeSocket(httpServer) {
       origin: (origin, callback) => {
         if (!origin) return callback(null, true);
         const cleanOrigin = origin.replace(/\/$/, '');
-        if (allowedOrigins.includes(cleanOrigin) || cleanOrigin.endsWith('.vercel.app')) {
+        if (allowedOrigins.includes(cleanOrigin)) {
           return callback(null, true);
         }
         return callback(new Error(`Socket origin not allowed: ${origin}`));
@@ -41,9 +41,8 @@ export function initializeSocket(httpServer) {
       }
 
       if (!token) {
-        // Allow anonymous connection with warning, or reject
-        logger.debug('Socket connection without auth token.');
-        return next();
+        logger.warn('Unauthorized socket connection attempt (no token).');
+        return next(new Error('Authentication error: Token required'));
       }
 
       const decoded = jwt.verify(token, env.JWT_SECRET);
@@ -51,7 +50,7 @@ export function initializeSocket(httpServer) {
       next();
     } catch (err) {
       logger.warn(`Socket auth error: ${err.message}`);
-      next();
+      next(new Error(`Authentication error: ${err.message}`));
     }
   });
 
