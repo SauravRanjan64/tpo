@@ -4,7 +4,8 @@ import AuditService from '../audit/audit.service.js';
 
 export class JobService {
   static async getJobs(query = {}) {
-    const { page = 1, limit = 20, search, branch, status = 'ACTIVE' } = query;
+    const { page = 1, limit = 20, search, branch, status: rawStatus = 'ACTIVE' } = query;
+    const status = rawStatus === 'ALL' ? undefined : rawStatus;
 
     let jobs = await db.jobDrive.findMany({
       where: status ? { status } : {},

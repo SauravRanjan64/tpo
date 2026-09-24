@@ -24,7 +24,7 @@ export const queryJobSchema = z.object({
   limit: z.coerce.number().int().positive().max(100).default(20),
   search: z.string().optional(),
   branch: z.string().optional(),
-  status: z.enum(['DRAFT', 'ACTIVE', 'CLOSED']).optional(),
+  status: z.enum(['ALL', 'DRAFT', 'ACTIVE', 'CLOSED']).optional(),
 });
 
 export default {
