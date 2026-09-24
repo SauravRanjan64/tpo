@@ -612,6 +612,13 @@ class InMemoryStore {
         Object.assign(n, data);
         return n;
       },
+      updateMany: async ({ where, data }) => {
+        let list = this.data.notifications;
+        if (where?.userId) list = list.filter(n => n.userId === where.userId);
+        if (where?.read !== undefined) list = list.filter(n => n.read === where.read);
+        list.forEach(n => Object.assign(n, data));
+        return { count: list.length };
+      },
     };
   }
 
