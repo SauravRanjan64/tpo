@@ -681,7 +681,7 @@ export async function handleMockRequest(config) {
     return { status: 200, data: { applicants: enriched } };
   }
 
-  const shortlistMatch = url.match(/^\/api\/company\/applications\/([^/]+)\/shortlist$/);
+  const shortlistMatch = url.match(/^\/api\/companies\/applications\/([^/]+)\/shortlist$/);
   if (shortlistMatch && method === 'POST') {
     const appId = shortlistMatch[1];
     const app = applications.find(a => a.id === appId);
@@ -734,7 +734,7 @@ export async function handleMockRequest(config) {
     return { status: 200, data: { application: app, message: 'Applicant shortlisted successfully.' } };
   }
 
-  const rejectMatch = url.match(/^\/api\/company\/applications\/([^/]+)\/reject$/);
+  const rejectMatch = url.match(/^\/api\/companies\/applications\/([^/]+)\/reject$/);
   if (rejectMatch && method === 'POST') {
     const appId = rejectMatch[1];
     const app = applications.find(a => a.id === appId);
