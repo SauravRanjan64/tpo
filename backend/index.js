@@ -516,4 +516,19 @@ app.patch('/api/notifications/read-all', (req, res) => {
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log(`DCRUST Placement Backend running on http://localhost:${PORT}`);
+
+  // Keep-alive: ping self every 4 minutes to prevent Render free tier spin-down
+  if (process.env.NODE_ENV === 'production') {
+    const BACKEND_URL = process.env.RENDER_EXTERNAL_URL || `https://placement-dcrust.onrender.com`;
+    setInterval(() => {
+      fetch(`${BACKEND_URL}/health`)
+        .then(() => console.log('[keep-alive] ping sent'))
+        .catch((err) => console.warn('[keep-alive] ping failed:', err.message));
+    }, 4 * 60 * 1000); // every 4 minutes
+  }
+});
+
+// Health check endpoint (used by keep-alive ping)
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
