@@ -13,7 +13,7 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.coerce.number().default(5000),
   MONGODB_URI: z.string().url().default('mongodb://localhost:27017/dcrust'),
-  JWT_SECRET: z.string().default('super_secret_jwt_key_for_dcrust_placement_system_2026'),
+  JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
   JWT_EXPIRES_IN: z.string().default('7d'),
   COOKIE_NAME: z.string().default('dcrust_auth_token'),
   CORS_ORIGIN: z.string().default('http://localhost:5173,http://localhost:3000,https://placement-dcrust.vercel.app'),
