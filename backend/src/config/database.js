@@ -822,16 +822,29 @@ class MongoStore {
 }
 
 // In non-test environments, connect to MongoDB. Tests remain isolated in memory.
+let databaseConnection = Promise.resolve();
 if (env.NODE_ENV !== 'test') {
-  mongoose.connect(env.MONGODB_URI, { serverSelectionTimeoutMS: 5000 })
+  databaseConnection = mongoose.connect(env.MONGODB_URI, { serverSelectionTimeoutMS: 5000 })
     .then(() => {
       activeDb = new MongoStore(mongoModels);
       logger.info('Connected to MongoDB database.');
     })
-    .catch(() => {
+    .catch((error) => {
+      if (env.NODE_ENV === 'production') {
+        logger.error('MongoDB connection failed; production storage is unavailable.');
+        throw error;
+      }
       logger.warn('MongoDB is not currently reachable; using in-memory store.');
-    activeDb = memoryDb;
+      activeDb = memoryDb;
     });
+}
+
+export function connectToDatabase() {
+  return databaseConnection;
+}
+
+export function getDatabaseStatus() {
+  return activeDb === memoryDb ? 'degraded' : 'connected';
 }
 
 export const db = new Proxy({}, {

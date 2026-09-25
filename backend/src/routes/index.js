@@ -9,13 +9,13 @@ import notificationRoutes from '../modules/notifications/notification.routes.js'
 import adminRoutes from '../modules/admin/admin.routes.js';
 import analyticsRoutes from '../modules/analytics/analytics.routes.js';
 import auditRoutes from '../modules/audit/audit.routes.js';
-import { db } from '../config/database.js';
+import { db, getDatabaseStatus } from '../config/database.js';
 
 const router = Router();
 
 // Health Check (Requirement #68)
 router.get('/health', async (req, res) => {
-  let dbStatus = 'connected';
+  let dbStatus = getDatabaseStatus();
   try {
     // Quick test count
     await db.user.count();

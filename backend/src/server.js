@@ -1,6 +1,7 @@
 import http from 'http';
 import { createApp } from './app.js';
 import { initializeSocket } from './socket/socket.server.js';
+import { connectToDatabase } from './config/database.js';
 import env from './config/env.js';
 import logger from './config/logger.js';
 
@@ -11,21 +12,34 @@ const server = http.createServer(app);
 initializeSocket(server);
 
 // Start HTTP Server
-server.listen(env.PORT, () => {
-  logger.info(`DCRUST Placement Backend V2 running in ${env.NODE_ENV} mode on port ${env.PORT}`);
-  logger.info(`Swagger Documentation available at: http://localhost:${env.PORT}/docs`);
-  logger.info(`Health check available at: http://localhost:${env.PORT}/api/health`);
+function startServer() {
+  server.listen(env.PORT, () => {
+    logger.info(`DCRUST Placement Backend V2 running in ${env.NODE_ENV} mode on port ${env.PORT}`);
+    logger.info(`Swagger Documentation available at: http://localhost:${env.PORT}/docs`);
+    logger.info(`Health check available at: http://localhost:${env.PORT}/api/health`);
 
-  // Self-ping to prevent Render free-tier sleep
-  if (env.NODE_ENV === 'production') {
-    const backendUrl = process.env.RENDER_EXTERNAL_URL || 'https://placement-dcrust.onrender.com';
-    setInterval(() => {
-      fetch(`${backendUrl}/api/health`)
-        .then(() => logger.debug('Keep-alive ping sent.'))
-        .catch((err) => logger.warn(`Keep-alive ping failed: ${err.message}`));
-    }, 4 * 60 * 1000);
-  }
-});
+    // Self-ping to prevent Render free-tier sleep
+    if (env.NODE_ENV === 'production') {
+      const backendUrl = process.env.RENDER_EXTERNAL_URL || 'https://placement-dcrust.onrender.com';
+      setInterval(() => {
+        fetch(`${backendUrl}/api/health`)
+          .then(() => logger.debug('Keep-alive ping sent.'))
+          .catch((err) => logger.warn(`Keep-alive ping failed: ${err.message}`));
+      }, 4 * 60 * 1000);
+    }
+  });
+}
+
+if (env.NODE_ENV === 'production') {
+  connectToDatabase()
+    .then(startServer)
+    .catch(() => {
+      logger.fatal('MongoDB connection failed; production server will not start.');
+      process.exitCode = 1;
+    });
+} else {
+  startServer();
+}
 
 // Graceful Shutdown
 function shutdown(signal) {
