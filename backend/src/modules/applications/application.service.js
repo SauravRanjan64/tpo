@@ -204,7 +204,22 @@ export class ApplicationService {
           message: 'Forbidden: You can only manage applications submitted to your company\'s jobs.',
         };
       }
-    } else if (user.role !== 'ADMIN' && user.role !== 'STUDENT') {
+    } else if (user.role === 'STUDENT') {
+      if (application.student?.userId !== user.id) {
+        return {
+          success: false,
+          code: 'AUTH_FORBIDDEN',
+          message: 'Students can only withdraw their own applications.',
+        };
+      }
+      if (newStatus !== APPLICATION_STATUS.WITHDRAWN) {
+        return {
+          success: false,
+          code: 'AUTH_FORBIDDEN',
+          message: 'Students can only withdraw applications.',
+        };
+      }
+    } else if (user.role !== 'ADMIN') {
       return {
         success: false,
         code: 'AUTH_FORBIDDEN',

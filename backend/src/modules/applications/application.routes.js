@@ -19,7 +19,7 @@ router.get('/:id', ApplicationController.getApplicationById);
 // Update status (Company & Admin) - Requirement #37
 router.patch(
   '/:id/status',
-  authorize('COMPANY', 'ADMIN'),
+  authorize('STUDENT', 'COMPANY', 'ADMIN'),
   validate(updateApplicationStatusSchema),
   ApplicationController.updateStatus
 );
