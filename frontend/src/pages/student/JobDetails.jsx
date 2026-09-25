@@ -286,7 +286,7 @@ export const JobDetails = () => {
             )}
 
             {/* Criteria Breakdown Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+            {eligibilityResult.details && <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
               {/* CGPA */}
               <div
                 className={`p-3 rounded-lg border ${
@@ -382,7 +382,7 @@ export const JobDetails = () => {
                   Your Batch: {eligibilityResult.details.batch.student}
                 </div>
               </div>
-            </div>
+            </div>}
 
             {/* Ineligibility Reason List if any */}
             {!eligibilityResult.eligible && eligibilityResult.reasons?.length > 0 && (
@@ -390,7 +390,7 @@ export const JobDetails = () => {
                 <span className="font-semibold block">Specific Reasons for Ineligibility:</span>
                 <ul className="list-disc list-inside space-y-0.5 text-rose-700">
                   {eligibilityResult.reasons.map((r, i) => (
-                    <li key={i}>{r}</li>
+                    <li key={i}>{typeof r === 'string' ? r : r.message}</li>
                   ))}
                 </ul>
               </div>
