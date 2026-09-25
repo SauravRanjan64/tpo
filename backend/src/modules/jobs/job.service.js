@@ -28,7 +28,7 @@ export class JobService {
       );
     }
 
-    if (branch) {
+    if (branch && branch !== 'ALL') {
       const bQuery = branch.toUpperCase();
       jobs = jobs.filter(j => j.branches?.some(b => b.branch.toUpperCase() === bQuery));
     }
