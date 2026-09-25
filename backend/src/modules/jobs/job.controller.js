@@ -31,7 +31,7 @@ export class JobController {
         userAgent: req.headers['user-agent'],
       };
 
-      const job = await JobService.createJob(req.body, req.user.id, reqMeta);
+      const job = await JobService.createJob(req.body, req.user.id, reqMeta, req.user.role);
       return ApiResponse.success(res, 'Job drive created successfully.', { job }, 201);
     } catch (err) {
       next(err);
@@ -45,7 +45,7 @@ export class JobController {
         userAgent: req.headers['user-agent'],
       };
 
-      const job = await JobService.updateJob(req.params.id, req.body, req.user.id, reqMeta);
+      const job = await JobService.updateJob(req.params.id, req.body, req.user.id, reqMeta, req.user.role);
       return ApiResponse.success(res, 'Job drive updated successfully.', { job });
     } catch (err) {
       next(err);

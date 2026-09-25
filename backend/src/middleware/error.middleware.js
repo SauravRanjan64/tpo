@@ -23,6 +23,10 @@ export function errorHandler(err, req, res, next) {
     );
   }
 
+  if (err.status === 403) {
+    return ApiResponse.error(res, err.message, ERROR_CODES.AUTH_FORBIDDEN, 403);
+  }
+
   if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError') {
     return ApiResponse.error(
       res,

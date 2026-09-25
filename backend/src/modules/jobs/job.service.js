@@ -60,10 +60,10 @@ export class JobService {
     });
   }
 
-  static async createJob(jobData, userId, reqMeta = {}) {
+  static async createJob(jobData, userId, reqMeta = {}, userRole = 'ADMIN') {
     // Resolve companyId: if user is COMPANY, lookup company. If ADMIN, can pass companyId
     let companyId = jobData.companyId;
-    if (!companyId) {
+    if (userRole === 'COMPANY' || !companyId) {
       const company = await db.company.findUnique({ where: { userId } });
       if (!company) {
         throw new Error('Company profile not found for user.');
@@ -111,10 +111,21 @@ export class JobService {
     return job;
   }
 
-  static async updateJob(id, updateData, userId, reqMeta = {}) {
+  static async updateJob(id, updateData, userId, reqMeta = {}, userRole = 'ADMIN') {
     const job = await db.jobDrive.findUnique({ where: { id } });
     if (!job) {
       throw new Error('Job drive not found.');
+    }
+
+    if (userRole === 'COMPANY') {
+      const company = await db.company.findUnique({ where: { userId } });
+      if (!company || job.companyId !== company.id) {
+        const error = new Error('You can only update your own job drives.');
+        error.status = 403;
+        throw error;
+      }
+      // A company cannot transfer a drive to another company.
+      delete updateData.companyId;
     }
 
     const updatedJob = await db.jobDrive.update({
