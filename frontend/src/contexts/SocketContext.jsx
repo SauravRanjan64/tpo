@@ -21,7 +21,7 @@ export const SocketProvider = ({ children }) => {
 
     // 2. In live backend mode (if VITE_USE_MOCK === 'false'), connect via socket.io-client
     let socket = null;
-    if (!useMockTransport) {
+    if (!useMockTransport && user) {
       try {
         // Socket.io connects to the server root, not the /api path
         const serverRoot = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/api$/, '');
