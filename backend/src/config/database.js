@@ -750,9 +750,10 @@ class MongoStore {
     if (where.studentId_jobId) return where.studentId_jobId;
     return where;
   }
-  async one(model, where) {
-    const query = this.models[model].findOne(this.normaliseWhere(where));
-    if (model !== 'user') query.select('-passwordHash');
+  async one(model, where, includePasswordHash = false) {
+    const { includePasswordHash: ignoredOption, ...criteria } = where || {};
+    const query = this.models[model].findOne(this.normaliseWhere(criteria));
+    if (model !== 'user' || !includePasswordHash) query.select('-passwordHash');
     return plain(await query.lean(false));
   }
   async many(model, where = {}) {
@@ -780,7 +781,7 @@ class MongoStore {
   resource(type) {
     const model = this.models[type];
     return {
-      findUnique: async ({ where, include } = {}) => this.addRelations(type, await this.one(type, where), include),
+      findUnique: async ({ where, include, includePasswordHash } = {}) => this.addRelations(type, await this.one(type, where, includePasswordHash), include),
       findFirst: async ({ where = {}, include } = {}) => {
         const query = model.findOne(this.normaliseWhere(where)).sort({ createdAt: -1 });
         if (type !== 'user') query.select('-passwordHash');
