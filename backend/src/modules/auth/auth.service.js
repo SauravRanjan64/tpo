@@ -41,6 +41,7 @@ export class AuthService {
   static async login(email, password, reqMeta = {}) {
     const user = await db.user.findUnique({
       where: { email },
+      includePasswordHash: true,
       include: {
         student: true,
         company: true,

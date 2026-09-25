@@ -234,7 +234,7 @@ class InMemoryStore {
 
   get user() {
     return {
-      findUnique: async ({ where, include }) => {
+      findUnique: async ({ where, include, includePasswordHash }) => {
         let u = null;
         if (where.id) u = this.data.users.find(x => x.id === where.id);
         if (where.email) u = this.data.users.find(x => x.email.toLowerCase() === where.email.toLowerCase());
@@ -242,11 +242,13 @@ class InMemoryStore {
         const res = { ...u };
         if (include?.student) res.student = this.data.students.find(s => s.userId === u.id) || null;
         if (include?.company) res.company = this.data.companies.find(c => c.userId === u.id) || null;
-        return res;
+        if (includePasswordHash === true) return res;
+        const { passwordHash, ...safeUser } = res;
+        return safeUser;
       },
       findMany: async (args = {}) => {
         return this.data.users.map(u => {
-          const res = { ...u };
+          const { passwordHash, ...res } = u;
           if (args.include?.student) res.student = this.data.students.find(s => s.userId === u.id) || null;
           if (args.include?.company) res.company = this.data.companies.find(c => c.userId === u.id) || null;
           return res;
@@ -272,7 +274,7 @@ class InMemoryStore {
         const u = this.data.users.find(x => x.id === where.id || x.email === where.email);
         if (!u) throw new Error('User not found');
         Object.assign(u, data, { updatedAt: new Date() });
-        return u;
+        return { ...u };
       },
       count: async () => this.data.users.length,
     };
@@ -287,7 +289,10 @@ class InMemoryStore {
         if (where.rollNumber) s = this.data.students.find(x => x.rollNumber === where.rollNumber);
         if (!s) return null;
         const res = { ...s };
-        if (include?.user) res.user = this.data.users.find(u => u.id === s.userId);
+        if (include?.user) {
+          const { passwordHash, ...safeUser } = this.data.users.find(u => u.id === s.userId) || {};
+          res.user = safeUser.id ? safeUser : null;
+        }
         if (include?.resumes) res.resumes = this.data.resumes.filter(r => r.studentId === s.id);
         if (include?.applications) res.applications = this.data.applications.filter(a => a.studentId === s.id);
         if (include?.consents) res.consents = this.data.consents.filter(c => c.studentId === s.id);
@@ -299,7 +304,10 @@ class InMemoryStore {
         if (args.where?.batch) list = list.filter(s => s.batch === args.where.batch);
         return list.map(s => {
           const res = { ...s };
-          if (args.include?.user) res.user = this.data.users.find(u => u.id === s.userId);
+          if (args.include?.user) {
+            const { passwordHash, ...safeUser } = this.data.users.find(u => u.id === s.userId) || {};
+            res.user = safeUser.id ? safeUser : null;
+          }
           if (args.include?.resumes) res.resumes = this.data.resumes.filter(r => r.studentId === s.id);
           return res;
         });
@@ -333,14 +341,20 @@ class InMemoryStore {
         if (where.userId) c = this.data.companies.find(x => x.userId === where.userId);
         if (!c) return null;
         const res = { ...c };
-        if (include?.user) res.user = this.data.users.find(u => u.id === c.userId);
+        if (include?.user) {
+          const { passwordHash, ...safeUser } = this.data.users.find(u => u.id === c.userId) || {};
+          res.user = safeUser.id ? safeUser : null;
+        }
         if (include?.jobDrives) res.jobDrives = this.data.jobDrives.filter(j => j.companyId === c.id);
         return res;
       },
       findMany: async (args = {}) => {
         return this.data.companies.map(c => {
           const res = { ...c };
-          if (args.include?.user) res.user = this.data.users.find(u => u.id === c.userId);
+          if (args.include?.user) {
+            const { passwordHash, ...safeUser } = this.data.users.find(u => u.id === c.userId) || {};
+            res.user = safeUser.id ? safeUser : null;
+          }
           if (args.include?.jobDrives) res.jobDrives = this.data.jobDrives.filter(j => j.companyId === c.id);
           return res;
         });
@@ -453,7 +467,8 @@ class InMemoryStore {
         if (include?.student) {
           res.student = this.data.students.find(s => s.id === a.studentId);
           if (include.student.include?.user && res.student) {
-            res.student.user = this.data.users.find(u => u.id === res.student.userId);
+            const { passwordHash, ...safeUser } = this.data.users.find(u => u.id === res.student.userId) || {};
+            res.student.user = safeUser.id ? safeUser : null;
           }
         }
         if (include?.job) {
@@ -475,7 +490,8 @@ class InMemoryStore {
           if (args.include?.student) {
             res.student = this.data.students.find(s => s.id === a.studentId);
             if (args.include.student.include?.user && res.student) {
-              res.student.user = this.data.users.find(u => u.id === res.student.userId);
+              const { passwordHash, ...safeUser } = this.data.users.find(u => u.id === res.student.userId) || {};
+              res.student.user = safeUser.id ? safeUser : null;
             }
           }
           if (args.include?.job) {
@@ -734,10 +750,22 @@ class MongoStore {
     if (where.studentId_jobId) return where.studentId_jobId;
     return where;
   }
-  async one(model, where) { return plain(await this.models[model].findOne(this.normaliseWhere(where)).lean(false)); }
-  async many(model, where = {}) { return (await this.models[model].find(where).lean(false)).map(plain); }
+  async one(model, where) {
+    const query = this.models[model].findOne(this.normaliseWhere(where));
+    if (model !== 'user') query.select('-passwordHash');
+    return plain(await query.lean(false));
+  }
+  async many(model, where = {}) {
+    const query = this.models[model].find(where);
+    if (model !== 'user') query.select('-passwordHash');
+    return (await query.lean(false)).map(plain);
+  }
   async addRelations(type, value, include = {}) {
     if (!value) return value;
+    if (type === 'user') {
+      const { passwordHash, ...safeUser } = value;
+      value = safeUser;
+    }
     const one = async (key, model, where, nested) => {
       if (include[key]) value[key] = await this.addRelations(model, await this.one(model, where), nested?.include || {});
     };
@@ -753,9 +781,14 @@ class MongoStore {
     const model = this.models[type];
     return {
       findUnique: async ({ where, include } = {}) => this.addRelations(type, await this.one(type, where), include),
-      findFirst: async ({ where = {}, include } = {}) => this.addRelations(type, plain(await model.findOne(this.normaliseWhere(where)).sort({ createdAt: -1 })), include),
+      findFirst: async ({ where = {}, include } = {}) => {
+        const query = model.findOne(this.normaliseWhere(where)).sort({ createdAt: -1 });
+        if (type !== 'user') query.select('-passwordHash');
+        return this.addRelations(type, plain(await query), include);
+      },
       findMany: async ({ where = {}, include, take } = {}) => {
         let query = model.find(this.normaliseWhere(where)).sort({ createdAt: -1 });
+        if (type !== 'user') query.select('-passwordHash');
         if (take) query = query.limit(take);
         const records = (await query).map(plain);
         return Promise.all(records.map(record => this.addRelations(type, record, include)));
