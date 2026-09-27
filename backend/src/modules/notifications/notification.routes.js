@@ -2,6 +2,8 @@ import { Router } from 'express';
 import NotificationService from './notification.service.js';
 import { authenticate } from '../../middleware/auth.middleware.js';
 import ApiResponse from '../../utils/apiResponse.js';
+import { validate } from '../../middleware/validate.middleware.js';
+import { idParamSchema } from '../../utils/request.schema.js';
 
 const router = Router();
 
@@ -25,9 +27,12 @@ router.patch('/read-all', async (req, res, next) => {
   }
 });
 
-router.patch('/:id/read', async (req, res, next) => {
+router.patch('/:id/read', validate(idParamSchema, 'params'), async (req, res, next) => {
   try {
     const notification = await NotificationService.markAsRead(req.params.id, req.user.id);
+    if (!notification) {
+      return ApiResponse.error(res, 'Notification not found.', 'RESOURCE_NOT_FOUND', 404);
+    }
     return ApiResponse.success(res, 'Notification marked as read.', { notification });
   } catch (err) {
     next(err);

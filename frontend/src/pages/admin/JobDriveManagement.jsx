@@ -74,6 +74,18 @@ export const JobDriveManagement = () => {
       accessor: 'status',
       render: (row) => <Badge status={row.status} size="sm" showDot />,
     },
+    {
+      header: 'Action',
+      align: 'right',
+      render: (row) => (
+        <Link
+          to={`/admin/jobs/${row.id}/edit`}
+          className="text-xs font-semibold text-indigo-700 hover:text-indigo-900"
+        >
+          Edit Drive
+        </Link>
+      ),
+    },
   ];
 
   return (

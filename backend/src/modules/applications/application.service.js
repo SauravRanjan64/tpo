@@ -1,11 +1,15 @@
 import { db } from '../../config/database.js';
 import { evaluateEligibility, createEligibilitySnapshot } from '../eligibility/eligibility.service.js';
 import { validateStatusTransition, APPLICATION_STATUS } from './statusTransition.service.js';
-import { calculateSkillMatch } from '../resumeMatcher/resumeMatcher.service.js';
+import ResumeService from '../resumes/resume.service.js';
 import AuditService from '../audit/audit.service.js';
 import NotificationService from '../notifications/notification.service.js';
 import { sanitizeStudentProfile } from '../../utils/privacy.util.js';
-import { emitNewApplicantToCompany } from '../../socket/socket.server.js';
+import {
+  emitApplicationStatusUpdate,
+  emitNewApplicantToCompany,
+  emitUserNotification,
+} from '../../socket/socket.server.js';
 
 export class ApplicationService {
   /**
@@ -88,27 +92,19 @@ export class ApplicationService {
     // 6. Resume & Match Score
     const resume = student.resumes?.[0] || null;
     let matchScore = null;
+    let match = null;
     if (resume) {
-      const match = calculateSkillMatch(resume.skills || [], job.skills || []);
+      match = await ResumeService.matchResumeToJob(resume, job);
       matchScore = match.score;
-
-      // Save match assistively
-      await db.resumeMatch.create({
-        data: {
-          resumeId: resume.id,
-          jobId: job.id,
-          score: match.score,
-          matchedSkills: match.matchedSkills,
-          missingSkills: match.missingSkills,
-        },
-      });
+    } else if (job.skills?.length) {
+      matchScore = 0;
     }
 
     // 7. Save immutable snapshot
     const eligibilitySnapshot = createEligibilitySnapshot(student, job, eligibilityResult);
 
     // 8. Execute within transaction
-    const application = await db.$transaction(async (tx) => {
+    const transactionResult = await db.$transaction(async (tx) => {
       // Create Application
       const app = await tx.application.create({
         data: {
@@ -120,6 +116,18 @@ export class ApplicationService {
           matchScore,
         },
       });
+
+      if (resume && match) {
+        await tx.resumeMatch.create({
+          data: {
+            resumeId: resume.id,
+            jobId: job.id,
+            score: match.score,
+            matchedSkills: match.matchedSkills,
+            missingSkills: match.missingSkills,
+          },
+        });
+      }
 
       // Create Audit Log
       await AuditService.record(
@@ -136,32 +144,35 @@ export class ApplicationService {
       );
 
       // Create Notification for Student
-      await NotificationService.send(
+      const notification = await NotificationService.send(
         {
           userId: studentUserId,
           type: 'APPLICATION_SUBMITTED',
           title: 'Application Submitted',
           message: `Your application for ${job.title} at ${job.company?.companyName || 'the recruiting company'} was submitted successfully.`,
         },
-        tx
+        tx,
+        { emit: false }
       );
 
-      return app;
+      return { application: app, notification };
     });
+
+    emitUserNotification(studentUserId, transactionResult.notification);
 
     // Real-time alert to company
     emitNewApplicantToCompany(job.companyId, {
-      applicationId: application.id,
+      applicationId: transactionResult.application.id,
       jobId: job.id,
       jobTitle: job.title,
       studentName: student.fullName,
-      appliedAt: application.appliedAt,
+      appliedAt: transactionResult.application.appliedAt,
     });
 
     return {
       success: true,
       message: 'Application submitted successfully.',
-      application,
+      application: transactionResult.application,
     };
   }
 
@@ -196,27 +207,19 @@ export class ApplicationService {
 
     // Company ownership verification (Requirement #38)
     if (user.role === 'COMPANY') {
+      if (newStatus === APPLICATION_STATUS.SELECTED) {
+        return {
+          success: false,
+          code: 'AUTH_FORBIDDEN',
+          message: 'Only the T&P Cell can mark an application as selected.',
+        };
+      }
       const companyUserMatches = application.job?.company?.userId === user.id;
       if (!companyUserMatches) {
         return {
           success: false,
           code: 'AUTH_FORBIDDEN',
           message: 'Forbidden: You can only manage applications submitted to your company\'s jobs.',
-        };
-      }
-    } else if (user.role === 'STUDENT') {
-      if (application.student?.userId !== user.id) {
-        return {
-          success: false,
-          code: 'AUTH_FORBIDDEN',
-          message: 'Students can only withdraw their own applications.',
-        };
-      }
-      if (newStatus !== APPLICATION_STATUS.WITHDRAWN) {
-        return {
-          success: false,
-          code: 'AUTH_FORBIDDEN',
-          message: 'Students can only withdraw applications.',
         };
       }
     } else if (user.role !== 'ADMIN') {
@@ -243,10 +246,11 @@ export class ApplicationService {
       updatePayload.shortlistedAt = new Date();
     } else if (newStatus === APPLICATION_STATUS.REJECTED) {
       updatePayload.rejectedAt = new Date();
+      if (reason) updatePayload.rejectionReason = reason;
     }
 
     // Transactional update
-    const updatedApplication = await db.$transaction(async (tx) => {
+    const transactionResult = await db.$transaction(async (tx) => {
       const updated = await tx.application.update({
         where: { id: applicationId },
         data: updatePayload,
@@ -274,24 +278,37 @@ export class ApplicationService {
       // Notification for student
       const studentUserId = application.student?.userId;
       if (studentUserId) {
-        await NotificationService.send(
+        const notification = await NotificationService.send(
           {
             userId: studentUserId,
             type: `APPLICATION_${newStatus}`,
             title: `Application ${newStatus.charAt(0) + newStatus.slice(1).toLowerCase()}`,
             message: `Your application for ${application.job?.title} has been updated to ${newStatus}.${reason ? ` Note: ${reason}` : ''}`,
           },
-          tx
+          tx,
+          { emit: false }
         );
+        return { application: updated, notification };
       }
 
-      return updated;
+      return { application: updated, notification: null };
     });
+
+    if (transactionResult.notification) {
+      const studentUserId = application.student?.userId;
+      emitApplicationStatusUpdate(studentUserId, {
+        studentId: studentUserId,
+        applicationId,
+        status: newStatus,
+        jobTitle: application.job?.title,
+      });
+      emitUserNotification(studentUserId, transactionResult.notification);
+    }
 
     return {
       success: true,
       message: `Application status updated to ${newStatus}.`,
-      application: updatedApplication,
+      application: transactionResult.application,
     };
   }
 
@@ -334,11 +351,14 @@ export class ApplicationService {
       throw new Error('Company not found.');
     }
 
-    const { jobId, status, branch, search, page = 1, limit = 20 } = query;
+    const {
+      jobId, status, branch, search, page = 1, limit = 20,
+      minCgpa, maxCgpa, maxBacklogs, minMatchScore, maxMatchScore,
+    } = query;
 
     // Load applications for this company's jobs
     let apps = await db.application.findMany({
-      where: status ? { status } : {},
+      where: status && status !== 'ALL' ? { status } : {},
       include: {
         job: true,
         student: {
@@ -360,6 +380,11 @@ export class ApplicationService {
     if (branch) {
       apps = apps.filter(a => a.student?.branch?.toUpperCase() === branch.toUpperCase());
     }
+    if (minCgpa != null) apps = apps.filter(a => Number(a.student?.cgpa) >= minCgpa);
+    if (maxCgpa != null) apps = apps.filter(a => Number(a.student?.cgpa) <= maxCgpa);
+    if (maxBacklogs != null) apps = apps.filter(a => Number(a.student?.activeBacklogs) <= maxBacklogs);
+    if (minMatchScore != null) apps = apps.filter(a => Number(a.matchScore || 0) >= minMatchScore);
+    if (maxMatchScore != null) apps = apps.filter(a => Number(a.matchScore || 0) <= maxMatchScore);
 
     if (search) {
       const q = search.toLowerCase();
@@ -378,10 +403,7 @@ export class ApplicationService {
     // Privacy Masking (Requirement #41)
     const sanitizedList = paginated.map(a => {
       // Full contact is only unmasked if SHORTLISTED or SELECTED
-      const isShortlistedOrSelected =
-        a.status === APPLICATION_STATUS.SHORTLISTED || a.status === APPLICATION_STATUS.SELECTED;
-
-      const sanitizedStudent = sanitizeStudentProfile(a.student, isShortlistedOrSelected);
+      const sanitizedStudent = sanitizeStudentProfile(a.student, false);
 
       return {
         id: a.id,
@@ -432,11 +454,7 @@ export class ApplicationService {
       return { unauthorized: true };
     }
 
-    const isFullAccess =
-      user.role === 'ADMIN' ||
-      (user.role === 'COMPANY' &&
-        (app.status === APPLICATION_STATUS.SHORTLISTED || app.status === APPLICATION_STATUS.SELECTED)) ||
-      user.role === 'STUDENT';
+    const isFullAccess = user.role === 'ADMIN' || user.role === 'STUDENT';
 
     const sanitizedStudent = sanitizeStudentProfile(app.student, isFullAccess);
 

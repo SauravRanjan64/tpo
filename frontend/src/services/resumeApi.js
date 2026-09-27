@@ -6,10 +6,9 @@ export const resumeApi = {
     return res.data;
   },
 
-  uploadResume: async (file, skills = []) => {
+  uploadResume: async (file) => {
     const formData = new FormData();
     formData.append('resume', file);
-    formData.append('skills', JSON.stringify(skills));
     const res = await axiosClient.post('/resume/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
@@ -21,8 +20,8 @@ export const resumeApi = {
     return res.data;
   },
 
-  matchResume: async ({ jobId, customSkills }) => {
-    const res = await axiosClient.post('/resume/match', { jobId, customSkills });
+  matchResume: async ({ jobId }) => {
+    const res = await axiosClient.post('/resume/match', { jobId });
     return res.data;
   },
 };

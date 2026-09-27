@@ -11,9 +11,11 @@ describe('Application Status Transition State Machine Tests', () => {
     expect(res.valid).toBe(true);
   });
 
-  test('Allowed transition: SHORTLISTED -> SELECTED is valid for COMPANY', () => {
+  test('Only ADMIN can transition SHORTLISTED -> SELECTED', () => {
     const res = validateStatusTransition(APPLICATION_STATUS.SHORTLISTED, APPLICATION_STATUS.SELECTED, 'COMPANY');
-    expect(res.valid).toBe(true);
+    expect(res.valid).toBe(false);
+    const adminRes = validateStatusTransition(APPLICATION_STATUS.SHORTLISTED, APPLICATION_STATUS.SELECTED, 'ADMIN');
+    expect(adminRes.valid).toBe(true);
   });
 
   test('Allowed transition: SHORTLISTED -> REJECTED is valid for COMPANY', () => {
@@ -21,9 +23,9 @@ describe('Application Status Transition State Machine Tests', () => {
     expect(res.valid).toBe(true);
   });
 
-  test('Allowed transition: APPLIED -> WITHDRAWN is valid for STUDENT', () => {
-    const res = validateStatusTransition(APPLICATION_STATUS.APPLIED, APPLICATION_STATUS.WITHDRAWN, 'STUDENT');
-    expect(res.valid).toBe(true);
+  test('Students cannot change an application status', () => {
+    const res = validateStatusTransition(APPLICATION_STATUS.APPLIED, APPLICATION_STATUS.REJECTED, 'STUDENT');
+    expect(res.valid).toBe(false);
   });
 
   test('Disallowed transition: REJECTED -> SELECTED is rejected', () => {

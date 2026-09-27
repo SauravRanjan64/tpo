@@ -10,7 +10,7 @@ import { db } from '../config/database.js';
  */
 export async function authenticate(req, res, next) {
   try {
-    const token = req.cookies?.[env.COOKIE_NAME] || req.headers.authorization?.replace(/^Bearer\s+/i, '');
+    const token = req.cookies?.[env.COOKIE_NAME];
 
     if (!token) {
       return ApiResponse.error(

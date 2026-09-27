@@ -4,10 +4,10 @@ import Button from './Button';
 
 export const FileUpload = ({
   onFileSelect,
-  accept = '.pdf,.doc,.docx',
+  accept = '.pdf,.docx',
   maxSizeMB = 5,
   label = 'Upload Document',
-  helper = 'PDF, DOC, or DOCX up to 5MB'
+  helper = 'PDF or DOCX up to 5MB'
 }) => {
   const fileInputRef = useRef(null);
   const [selectedFile, setSelectedFile] = useState(null);

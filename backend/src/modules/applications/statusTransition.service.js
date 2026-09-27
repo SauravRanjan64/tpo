@@ -3,14 +3,12 @@ export const APPLICATION_STATUS = {
   SHORTLISTED: 'SHORTLISTED',
   REJECTED: 'REJECTED',
   SELECTED: 'SELECTED',
-  WITHDRAWN: 'WITHDRAWN',
 };
 
 export const ALLOWED_TRANSITIONS = {
   [APPLICATION_STATUS.APPLIED]: [
     APPLICATION_STATUS.SHORTLISTED,
     APPLICATION_STATUS.REJECTED,
-    APPLICATION_STATUS.WITHDRAWN,
   ],
   [APPLICATION_STATUS.SHORTLISTED]: [
     APPLICATION_STATUS.SELECTED,
@@ -18,7 +16,6 @@ export const ALLOWED_TRANSITIONS = {
   ],
   [APPLICATION_STATUS.REJECTED]: [],
   [APPLICATION_STATUS.SELECTED]: [],
-  [APPLICATION_STATUS.WITHDRAWN]: [],
 };
 
 /**
@@ -36,14 +33,17 @@ export function validateStatusTransition(currentStatus, requestedStatus, userRol
     };
   }
 
-  // Students can only withdraw an APPLIED application
-  if (userRole === 'STUDENT') {
-    if (currentStatus === APPLICATION_STATUS.APPLIED && requestedStatus === APPLICATION_STATUS.WITHDRAWN) {
-      return { valid: true };
-    }
+  if (requestedStatus === APPLICATION_STATUS.SELECTED && userRole !== 'ADMIN') {
     return {
       valid: false,
-      message: 'Students are only permitted to withdraw an application before it is processed.',
+      message: 'Cannot transition application status to SELECTED: only the T&P Cell can select applicants.',
+    };
+  }
+
+  if (userRole === 'STUDENT') {
+    return {
+      valid: false,
+      message: 'Students cannot change an application status.',
     };
   }
 

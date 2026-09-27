@@ -3,13 +3,13 @@ import jwt from 'jsonwebtoken';
 import cookie from 'cookie';
 import env from '../config/env.js';
 import logger from '../config/logger.js';
+import { db } from '../config/database.js';
 
 let io = null;
 
 export function initializeSocket(httpServer) {
   const configuredOrigins = env.CORS_ORIGIN.split(',').map(s => s.trim().replace(/\/$/, ''));
-  const defaultOrigins = ['http://localhost:5173', 'http://localhost:3000', 'https://placement-dcrust.vercel.app'];
-  const allowedOrigins = Array.from(new Set([...configuredOrigins, ...defaultOrigins]));
+  const allowedOrigins = Array.from(new Set(configuredOrigins));
 
   io = new Server(httpServer, {
     cors: {
@@ -26,7 +26,7 @@ export function initializeSocket(httpServer) {
   });
 
   // Socket Authentication Middleware
-  io.use((socket, next) => {
+  io.use(async (socket, next) => {
     try {
       const cookieHeader = socket.handshake.headers.cookie;
       let token = null;
@@ -36,17 +36,24 @@ export function initializeSocket(httpServer) {
         token = parsedCookies[env.COOKIE_NAME];
       }
 
-      if (!token && socket.handshake.auth?.token) {
-        token = socket.handshake.auth.token;
-      }
-
       if (!token) {
         logger.warn('Unauthorized socket connection attempt (no token).');
         return next(new Error('Authentication error: Token required'));
       }
 
       const decoded = jwt.verify(token, env.JWT_SECRET);
-      socket.user = decoded;
+      const user = await db.user.findUnique({
+        where: { id: decoded.id },
+        include: { company: true },
+      });
+      if (!user || !user.isActive) {
+        return next(new Error('Authentication error: Account is unavailable'));
+      }
+      socket.user = {
+        id: user.id,
+        role: user.role,
+        companyId: user.company?.id || null,
+      };
       next();
     } catch (err) {
       logger.warn(`Socket auth error: ${err.message}`);
@@ -90,6 +97,10 @@ export function emitApplicationStatusUpdate(userId, payload) {
   }
 }
 
+export function emitUserNotification(userId, notification) {
+  if (io) io.to(`user:${userId}`).emit('notification:new', notification);
+}
+
 /**
  * Emits new application notification to company room
  */
@@ -104,5 +115,6 @@ export default {
   initializeSocket,
   getIO,
   emitApplicationStatusUpdate,
+  emitUserNotification,
   emitNewApplicantToCompany,
 };

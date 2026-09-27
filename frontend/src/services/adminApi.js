@@ -1,4 +1,5 @@
 import axiosClient from './axiosClient';
+import { normalizeJob, toJobPayload } from './jobApi';
 
 export const adminApi = {
   getStats: async () => {
@@ -22,12 +23,13 @@ export const adminApi = {
   },
 
   getJobs: async () => {
-    const res = await axiosClient.get('/admin/jobs');
-    return res.data;
+    const res = await axiosClient.get('/admin/jobs', { params: { status: 'ALL' } });
+    const jobs = res.data.jobs?.map(normalizeJob) || [];
+    return { ...res.data, jobs, drives: jobs };
   },
 
   createJobDrive: async (data) => {
-    const res = await axiosClient.post('/admin/jobs', data);
+    const res = await axiosClient.post('/admin/jobs', toJobPayload(data));
     return res.data;
   },
 
@@ -37,7 +39,20 @@ export const adminApi = {
   },
 
   exportCsv: async (params = {}) => {
-    const res = await axiosClient.get('/admin/exports/csv', { params });
+    const filteredParams = Object.fromEntries(
+      Object.entries(params).filter(([, value]) => value !== undefined && value !== 'ALL' && value !== '')
+    );
+    const res = await axiosClient.get('/admin/exports/csv', {
+      params: filteredParams,
+      responseType: 'blob',
+    });
+    const disposition = res.headers['content-disposition'] || '';
+    const filename = disposition.match(/filename="([^"]+)"/)?.[1] || 'DCRUST_Candidates.csv';
+    return { blob: res.data, filename };
+  },
+
+  updateApplicationStatus: async (applicationId, status) => {
+    const res = await axiosClient.patch(`/applications/${applicationId}/status`, { status });
     return res.data;
   },
 

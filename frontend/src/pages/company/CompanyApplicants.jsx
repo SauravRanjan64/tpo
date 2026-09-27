@@ -27,27 +27,28 @@ export const CompanyApplicants = () => {
 
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('ALL');
+  const [branch, setBranch] = useState('ALL');
+  const [minCgpa, setMinCgpa] = useState('ALL');
+  const [maxBacklogs, setMaxBacklogs] = useState('ALL');
+  const [minMatchScore, setMinMatchScore] = useState('ALL');
   const [applicantToShortlist, setApplicantToShortlist] = useState(null);
   const [applicantToReject, setApplicantToReject] = useState(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const [viewingApplicant, setViewingApplicant] = useState(null);
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['company-applicants', { status }],
-    queryFn: () => companyApi.getApplicants({ status }),
+    queryKey: ['company-applicants', { status, branch, minCgpa, maxBacklogs, minMatchScore, search }],
+    queryFn: () => companyApi.getApplicants({
+      status,
+      branch: branch === 'ALL' ? undefined : branch,
+      minCgpa: minCgpa === 'ALL' ? undefined : minCgpa,
+      maxBacklogs: maxBacklogs === 'ALL' ? undefined : maxBacklogs,
+      minMatchScore: minMatchScore === 'ALL' ? undefined : minMatchScore,
+      search: search || undefined,
+    }),
   });
 
   const applicants = data?.applicants || [];
-
-  const filtered = applicants.filter((app) => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return (
-      app.studentName?.toLowerCase().includes(q) ||
-      app.rollNumber?.includes(q) ||
-      app.id?.toLowerCase().includes(q)
-    );
-  });
 
   // Shortlist mutation
   const shortlistMutation = useMutation({
@@ -141,17 +142,14 @@ export const CompanyApplicants = () => {
       header: 'Contact Info',
       accessor: 'phone',
       render: (row) => {
-        const isAuthorized = row.status === 'SHORTLISTED' || row.status === 'SELECTED';
         return (
           <div className="text-xs">
-            <span className={`font-mono block ${isAuthorized ? 'text-slate-800 font-semibold' : 'text-slate-400'}`}>
+            <span className="font-mono block text-slate-400">
               {row.phone}
             </span>
-            {!isAuthorized && (
-              <span className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
-                <Lock className="w-3 h-3" /> Masked before shortlist
-              </span>
-            )}
+            <span className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
+              <Lock className="w-3 h-3" /> Student contact details are masked
+            </span>
           </div>
         );
       },
@@ -224,6 +222,18 @@ export const CompanyApplicants = () => {
           onChange={setStatus}
           options={STATUS_OPTIONS}
         />
+        <Filter label="Branch" value={branch} onChange={setBranch} options={[
+          { value: 'ALL', label: 'All branches' }, 'CSE', 'IT', 'ECE', 'EEE', 'MECHANICAL', 'CIVIL', 'BIOTECHNOLOGY',
+        ]} />
+        <Filter label="Min CGPA" value={minCgpa} onChange={setMinCgpa} options={[
+          { value: 'ALL', label: 'Any CGPA' }, '6', '7', '8', '9',
+        ]} />
+        <Filter label="Max backlogs" value={maxBacklogs} onChange={setMaxBacklogs} options={[
+          { value: 'ALL', label: 'Any backlogs' }, '0', '1', '2',
+        ]} />
+        <Filter label="Min match" value={minMatchScore} onChange={setMinMatchScore} options={[
+          { value: 'ALL', label: 'Any match' }, '50', '75', '90',
+        ]} />
       </div>
 
       {isLoading ? (
@@ -234,14 +244,14 @@ export const CompanyApplicants = () => {
           message="Could not retrieve candidate applications."
           onRetry={refetch}
         />
-      ) : filtered.length === 0 ? (
+      ) : applicants.length === 0 ? (
         <EmptyState
           icon={Users}
           title="No applicants found"
           description="No candidate applications matched the active search filters."
         />
       ) : (
-        <Table columns={columns} data={filtered} />
+        <Table columns={columns} data={applicants} />
       )}
 
       {/* Shortlist Confirmation Dialog */}
@@ -250,7 +260,7 @@ export const CompanyApplicants = () => {
         onClose={() => setApplicantToShortlist(null)}
         onConfirm={() => shortlistMutation.mutate(applicantToShortlist.id)}
         title={`Shortlist ${applicantToShortlist?.studentName}?`}
-        description="The student will immediately receive a real-time notification on their portal. Their unmasked contact information will be made accessible for interview scheduling."
+        description="The student will receive a real-time notification on their portal. Student contact details remain private."
         confirmText="Confirm Shortlist"
         cancelText="Cancel"
         variant="success"
@@ -340,8 +350,18 @@ export const CompanyApplicants = () => {
             <div className="p-3 bg-indigo-50/60 rounded-lg border border-indigo-100 space-y-1">
               <span className="font-semibold text-indigo-900 block">Contact Information</span>
               <p className="text-slate-700 font-mono">Phone: {viewingApplicant.phone}</p>
-              <p className="text-slate-700 font-mono">Email: {viewingApplicant.email}</p>
+              <p className="text-slate-600">Student contact details are protected by the T&amp;P Cell.</p>
             </div>
+            {viewingApplicant.resumeUrl && (
+              <a
+                href={viewingApplicant.resumeUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex text-xs font-semibold text-indigo-700 hover:text-indigo-900"
+              >
+                View submitted resume
+              </a>
+            )}
           </div>
         </Modal>
       )}

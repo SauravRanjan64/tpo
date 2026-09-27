@@ -127,6 +127,19 @@ export function evaluateEligibility(student, job, options = {}) {
     });
   }
 
+  const eligibleBatches = Array.isArray(job.eligibleBatches)
+    ? job.eligibleBatches.map(Number)
+    : job.eligibleBatch == null ? [] : [Number(job.eligibleBatch)];
+  const studentBatch = Number(student.batch);
+  if (eligibleBatches.length > 0 && !eligibleBatches.includes(studentBatch)) {
+    reasons.push({
+      rule: 'BATCH',
+      required: eligibleBatches,
+      actual: studentBatch,
+      message: `Eligible batches are ${eligibleBatches.join(', ')}. Your batch is ${studentBatch}.`,
+    });
+  }
+
   return {
     eligible: reasons.length === 0,
     reasons,
@@ -153,6 +166,9 @@ export function createEligibilitySnapshot(student, job, eligibilityResult) {
     studentBacklogs: Number(student.activeBacklogs || 0),
     allowedBacklogs: Number(job.maxBacklogs ?? 0),
     batch: student.batch,
+    eligibleBatches: Array.isArray(job.eligibleBatches)
+      ? job.eligibleBatches
+      : job.eligibleBatch == null ? [] : [Number(job.eligibleBatch)],
     eligible: eligibilityResult.eligible,
     reasons: eligibilityResult.reasons,
   };

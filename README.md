@@ -30,7 +30,7 @@ Official, production-quality frontend application for the **Deenbandhu Chhotu Ra
 - **Recruiter Dashboard**: Drive statistics and candidate screening funnel.
 - **Candidate Screening**: Search and filter applicants with privacy-masked contact info.
 - **Shortlisting & Rejection Workflows**: One-click actions with modal confirmation that trigger real-time student updates.
-- **Shortlisted Candidate Directory**: Authorized unmasked direct student contact access.
+- **Shortlisted Candidate Directory**: Applicant status view with student contact details kept masked.
 
 ---
 
@@ -50,62 +50,45 @@ Official, production-quality frontend application for the **Deenbandhu Chhotu Ra
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
-### Run frontend and backend together
+### Configure MongoDB
 
-From the project root, install the root development dependency once and start both applications with one command:
+The backend requires MongoDB; it does not fall back to browser or in-memory application data. Use MongoDB Atlas or a local replica set (application state changes use MongoDB transactions).
 
-```bash
+Copy `backend/.env.example` to `backend/.env` and set `MONGODB_URI` and a private `JWT_SECRET` of at least 32 characters. Do not commit `.env`.
+
+### Install and seed development data
+
+```powershell
 npm install
+npm install --prefix frontend
+npm install --prefix backend
+npm run db:seed --prefix backend
 npm run dev
 ```
 
-The frontend runs at `http://localhost:5173` and the backend runs at `http://localhost:5000`.
+The frontend is available at `http://localhost:5173`, the API at `http://localhost:5000`, and API documentation at `http://localhost:5000/docs`.
 
-### Backend database: MongoDB
+### Deployment environment
 
-The Express backend uses MongoDB through Mongoose. Set `MONGODB_URI` in `backend/.env`
-to the MongoDB Atlas connection string.
+Production frontend builds use `https://placement-dcrust.onrender.com/api` (configured in `frontend/.env.production`). For Vercel, set `VITE_API_URL` to that same API URL in the project's Environment Variables and redeploy. The backend must allow `https://placement-dcrust.vercel.app` in `CORS_ORIGIN`; the default backend configuration already includes it. Configure `MONGODB_URI` and `JWT_SECRET` as private Render environment variables, never as frontend variables or committed files.
 
-```bash
-cd backend
-npm install
-npm run db:seed
-npm run dev
+Seeded development-only accounts (password: `Student@123` for students, `Recruiter@123` for the recruiter, and `Admin@123` for the T&P admin):
+
+| Role | Email |
+|---|---|
+| Student | `student@dcrust.ac.in` |
+| Ineligible student | `priya@dcrust.ac.in` |
+| Student consent test | `aman@dcrust.ac.in` |
+| Company recruiter | `recruiter@tcs.com` |
+| T&P Admin | `admin@dcrust.edu.in` |
+
+Change or remove these seeded accounts before deploying to a shared or production environment. Login uses the backend HttpOnly cookie; the frontend does not store authentication tokens.
+
+### Tests and production build
+
+```powershell
+npm test --prefix backend
+npm run build --prefix frontend
 ```
-
-### 1. Install Dependencies
-```bash
-cd frontend
-npm install
-```
-
-### 2. Start Frontend in Development Mode
-```bash
-npm run dev
-```
-Open [http://localhost:5173](http://localhost:5173) in your browser.
-
-> By default, the application runs with an **integrated in-browser mock engine & Socket.IO simulator** so all workflows (student apply, eligibility check, admin creation, recruiter shortlisting, notifications) work immediately without external dependencies.
-
-### 3. (Optional) Run Companion Express Backend
-```bash
-# In another terminal:
-cd backend
-npm run dev
-```
-
----
-
-## 🔑 Demo Personas for Quick Testing
-
-Use the quick demo buttons on the `/login` page:
-
-| Persona | Email | Description |
-|---|---|---|
-| **Eligible Student** | `student@dcrust.ac.in` | Rahul Sharma (CSE, 8.2 CGPA, 0 backlogs) |
-| **Ineligible Student** | `priya@dcrust.ac.in` | Priya Verma (ECE, 6.4 CGPA, 1 backlog) |
-| **Consent Test Student** | `aman@dcrust.ac.in` | Aman Malik (First-login consent screen test) |
-| **T&P Admin** | `admin@dcrust.ac.in` | Dr. R. K. Sehrawat (Head, T&P Cell) |
-| **Company Recruiter** | `recruiter@tcs.com` | Rajesh Mittal (ABC Technologies Recruiter) |

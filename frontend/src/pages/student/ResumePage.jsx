@@ -36,7 +36,7 @@ export const ResumePage = () => {
 
   const uploadMutation = useMutation({
     mutationFn: (file) =>
-      resumeApi.uploadResume(file, ['React', 'Node.js', 'Express', 'SQL', 'Git', 'Data Structures', 'JavaScript']),
+      resumeApi.uploadResume(file),
     onSuccess: () => {
       showToast({
         type: 'success',
@@ -201,14 +201,14 @@ export const ResumePage = () => {
       {(showUploadMode || !resume) && (
         <Card
           title={resume ? 'Replace Current Resume' : 'Upload New Resume'}
-          subtitle="Maximum file size: 5 MB • Formats: PDF, DOC, DOCX"
+          subtitle="Maximum file size: 5 MB • Formats: PDF and DOCX"
         >
           <div className="space-y-4">
             <FileUpload
               maxSizeMB={5}
-              accept=".pdf,.doc,.docx"
+              accept=".pdf,.docx"
               label="Select your updated resume document"
-              helper="Only PDF, DOC, DOCX allowed. Maximum file size 5MB."
+              helper="Only PDF or DOCX allowed. Maximum file size 5MB."
               onFileSelect={setSelectedFile}
             />
 

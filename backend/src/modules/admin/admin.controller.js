@@ -47,7 +47,7 @@ export class AdminController {
 
   static async getJobs(req, res, next) {
     try {
-      const result = await JobService.getJobs(req.query);
+      const result = await JobService.getJobs(req.query, req.user.role);
       return ApiResponse.success(res, 'Jobs retrieved.', { jobs: result.jobs }, 200, result.pagination);
     } catch (err) {
       next(err);

@@ -104,10 +104,13 @@ export class AdminService {
   }
 
   static async getAllApplications(query = {}) {
-    const { jobId, branch, batch, status, search, page = 1, limit = 20 } = query;
+    const {
+      jobId, branch, batch, status, search, page = 1, limit = 20,
+      minCgpa, maxCgpa, maxBacklogs, minMatchScore, maxMatchScore,
+    } = query;
 
     let apps = await db.application.findMany({
-      where: status ? { status } : {},
+      where: status && status !== 'ALL' ? { status } : {},
       include: {
         job: { include: { company: true } },
         student: { include: { user: true } },
@@ -123,6 +126,11 @@ export class AdminService {
     if (batch) {
       apps = apps.filter(a => a.student?.batch === Number(batch));
     }
+    if (minCgpa != null) apps = apps.filter(a => Number(a.student?.cgpa) >= minCgpa);
+    if (maxCgpa != null) apps = apps.filter(a => Number(a.student?.cgpa) <= maxCgpa);
+    if (maxBacklogs != null) apps = apps.filter(a => Number(a.student?.activeBacklogs) <= maxBacklogs);
+    if (minMatchScore != null) apps = apps.filter(a => Number(a.matchScore || 0) >= minMatchScore);
+    if (maxMatchScore != null) apps = apps.filter(a => Number(a.matchScore || 0) <= maxMatchScore);
     if (search) {
       const q = search.toLowerCase();
       apps = apps.filter(
@@ -170,10 +178,12 @@ export class AdminService {
    * Streams CSV output directly to response stream (Requirement #49)
    */
   static async streamApplicationsCsv(res, filters = {}, adminUserId, reqMeta = {}) {
-    const { jobId, branch, batch, status } = filters;
+    const {
+      jobId, branch, batch, status, minCgpa, maxCgpa, maxBacklogs, minMatchScore, maxMatchScore,
+    } = filters;
 
     let apps = await db.application.findMany({
-      where: status ? { status } : {},
+      where: status && status !== 'ALL' ? { status } : {},
       include: {
         job: { include: { company: true } },
         student: { include: { user: true } },
@@ -183,6 +193,11 @@ export class AdminService {
     if (jobId) apps = apps.filter(a => a.jobId === jobId);
     if (branch) apps = apps.filter(a => a.student?.branch?.toUpperCase() === branch.toUpperCase());
     if (batch) apps = apps.filter(a => a.student?.batch === Number(batch));
+    if (minCgpa != null) apps = apps.filter(a => Number(a.student?.cgpa) >= minCgpa);
+    if (maxCgpa != null) apps = apps.filter(a => Number(a.student?.cgpa) <= maxCgpa);
+    if (maxBacklogs != null) apps = apps.filter(a => Number(a.student?.activeBacklogs) <= maxBacklogs);
+    if (minMatchScore != null) apps = apps.filter(a => Number(a.matchScore || 0) >= minMatchScore);
+    if (maxMatchScore != null) apps = apps.filter(a => Number(a.matchScore || 0) <= maxMatchScore);
 
     // Headers
     res.setHeader('Content-Type', 'text/csv');
@@ -213,7 +228,7 @@ export class AdminService {
     stringifier.pipe(res);
 
     for (const a of apps) {
-      stringifier.write({
+      const row = {
         applicationId: a.id,
         studentName: a.student?.fullName || '',
         rollNumber: a.student?.rollNumber || '',
@@ -227,7 +242,13 @@ export class AdminService {
         status: a.status,
         matchScore: a.matchScore ?? 'N/A',
         appliedAt: a.appliedAt ? new Date(a.appliedAt).toISOString() : '',
-      });
+      };
+      for (const [key, value] of Object.entries(row)) {
+        if (typeof value === 'string' && /^[\s]*[=+\-@]/.test(value)) {
+          row[key] = `'${value}`;
+        }
+      }
+      stringifier.write(row);
     }
 
     stringifier.end();

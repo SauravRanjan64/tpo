@@ -103,13 +103,13 @@ describe('End-to-End Application Lifecycle & Integrity Integration Tests', () =>
     expect(shortlistRes.status).toBe(200);
     expect(shortlistRes.body.data.application.status).toBe('SHORTLISTED');
 
-    // Step 7: Recruiter views applicants again - Phone number is now UNMASKED for shortlisted student
-    const unmaskedApplicantsRes = await request(app)
+    // Step 7: Recruiter phone access remains masked after shortlisting.
+    const shortlistedApplicantsRes = await request(app)
       .get('/api/companies/applicants')
       .set('Cookie', recruiterCookie);
 
-    const shortlistedApplicant = unmaskedApplicantsRes.body.data.applicants.find(a => a.id === createdApp.id);
-    expect(shortlistedApplicant.phone).toBe('+91 9876543210'); // Unmasked!
+    const shortlistedApplicant = shortlistedApplicantsRes.body.data.applicants.find(a => a.id === createdApp.id);
+    expect(shortlistedApplicant.phone).toBe('98******10');
 
     // Step 8: Student views their applications and sees updated SHORTLISTED status
     const myAppsRes = await request(app)

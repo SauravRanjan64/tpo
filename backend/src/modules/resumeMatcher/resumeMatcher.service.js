@@ -19,7 +19,7 @@ export function calculateSkillMatch(resumeInput, jobSkillsInput) {
 
   if (requiredSkills.length === 0) {
     return {
-      score: 100,
+      score: 0,
       matchedSkills: [],
       missingSkills: [],
     };

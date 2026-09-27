@@ -30,15 +30,13 @@ function startServer() {
   });
 }
 
-if (env.NODE_ENV === 'production') {
+if (env.NODE_ENV !== 'test') {
   connectToDatabase()
     .then(startServer)
-    .catch(() => {
-      logger.fatal('MongoDB connection failed; production server will not start.');
+    .catch((error) => {
+      logger.fatal({ message: error.message }, 'MongoDB connection failed; server will not start.');
       process.exitCode = 1;
     });
-} else {
-  startServer();
 }
 
 // Graceful Shutdown

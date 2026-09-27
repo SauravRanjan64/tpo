@@ -1,5 +1,6 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import companyApi from '../../services/companyApi';
 import Table from '../../components/common/Table';
 import Badge from '../../components/common/Badge';
@@ -7,6 +8,7 @@ import { TableSkeleton } from '../../components/common/LoadingSkeleton';
 import EmptyState from '../../components/common/EmptyState';
 import ErrorState from '../../components/common/ErrorState';
 import { Briefcase } from 'lucide-react';
+import Button from '../../components/common/Button';
 
 export const CompanyDrives = () => {
   const { data, isLoading, error, refetch } = useQuery({
@@ -68,17 +70,31 @@ export const CompanyDrives = () => {
       accessor: 'status',
       render: (row) => <Badge status={row.status} size="sm" showDot />,
     },
+    {
+      header: 'Action',
+      render: (row) => (
+        <Link
+          to={`/company/jobs/${row.id}/edit`}
+          className="text-xs font-semibold text-indigo-700 hover:text-indigo-900"
+        >
+          Edit Drive
+        </Link>
+      ),
+    },
   ];
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-bold text-slate-900 tracking-tight">
-          Active Placement Drives
-        </h2>
-        <p className="text-xs text-slate-500 mt-0.5">
-          Placement drives published on the university portal under your corporate account.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-bold text-slate-900 tracking-tight">Job Drives</h2>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Placement drives published on the university portal under your company account.
+          </p>
+        </div>
+        <Link to="/company/jobs/create">
+          <Button variant="primary" size="sm">Create Job Drive</Button>
+        </Link>
       </div>
 
       {isLoading ? (

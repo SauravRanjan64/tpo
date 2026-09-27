@@ -1,38 +1,31 @@
 import { db } from '../../config/database.js';
-import logger from '../../config/logger.js';
 
 export class AuditService {
   /**
    * Records an audit log entry
    */
   static async record(entry, clientOrTx = db) {
-    try {
-      const {
-        userId = null,
+    const {
+      userId = null,
+      action,
+      entityType,
+      entityId = null,
+      metadata = null,
+      ipAddress = null,
+      userAgent = null,
+    } = entry;
+
+    return clientOrTx.auditLog.create({
+      data: {
+        userId,
         action,
         entityType,
-        entityId = null,
-        metadata = null,
-        ipAddress = null,
-        userAgent = null,
-      } = entry;
-
-      return await clientOrTx.auditLog.create({
-        data: {
-          userId,
-          action,
-          entityType,
-          entityId,
-          metadata,
-          ipAddress,
-          userAgent,
-        },
-      });
-    } catch (err) {
-      logger.error({ err, entry }, 'Failed to record audit log');
-      // Do not crash the caller if audit logging encounters an issue
-      return null;
-    }
+        entityId,
+        metadata,
+        ipAddress,
+        userAgent,
+      },
+    });
   }
 
   static async getLogs(filters = {}) {

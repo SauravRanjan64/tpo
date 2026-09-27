@@ -21,8 +21,7 @@ export function createApp() {
 
   // 2. CORS
   const configuredOrigins = env.CORS_ORIGIN.split(',').map(s => s.trim().replace(/\/$/, ''));
-  const defaultOrigins = ['http://localhost:5173', 'http://localhost:3000', 'https://placement-dcrust.vercel.app'];
-  const allowedOrigins = Array.from(new Set([...configuredOrigins, ...defaultOrigins]));
+  const allowedOrigins = Array.from(new Set(configuredOrigins));
 
   app.use(cors({
     origin: (origin, callback) => {
@@ -35,6 +34,7 @@ export function createApp() {
       return callback(new Error(`Origin ${origin} is not allowed by CORS policy`));
     },
     credentials: true,
+    exposedHeaders: ['Content-Disposition'],
   }));
 
   // 3. Request Parsing & Cookies

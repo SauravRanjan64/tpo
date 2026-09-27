@@ -6,7 +6,7 @@ import Badge from '../../components/common/Badge';
 import { TableSkeleton } from '../../components/common/LoadingSkeleton';
 import EmptyState from '../../components/common/EmptyState';
 import ErrorState from '../../components/common/ErrorState';
-import { UserCheck, Phone, Mail, Award } from 'lucide-react';
+import { UserCheck, Phone } from 'lucide-react';
 
 export const CompanyShortlisted = () => {
   const { data, isLoading, error, refetch } = useQuery({
@@ -46,22 +46,12 @@ export const CompanyShortlisted = () => {
       ),
     },
     {
-      header: 'Authorized Mobile',
+      header: 'Masked Mobile',
       accessor: 'phone',
       render: (row) => (
         <div className="flex items-center gap-1.5 text-xs text-slate-800 font-mono font-medium">
           <Phone className="w-3.5 h-3.5 text-indigo-600" />
           <span>{row.phone}</span>
-        </div>
-      ),
-    },
-    {
-      header: 'Email Address',
-      accessor: 'email',
-      render: (row) => (
-        <div className="flex items-center gap-1.5 text-xs text-slate-700 font-mono">
-          <Mail className="w-3.5 h-3.5 text-slate-400" />
-          <span>{row.email}</span>
         </div>
       ),
     },
@@ -79,7 +69,7 @@ export const CompanyShortlisted = () => {
           Shortlisted Candidates
         </h2>
         <p className="text-xs text-slate-500 mt-0.5">
-          Candidates qualified for interviews. Direct student contact channels are unmasked and authorized.
+          Candidates qualified for interviews. Student phone numbers remain privacy-masked.
         </p>
       </div>
 
@@ -95,7 +85,7 @@ export const CompanyShortlisted = () => {
         <EmptyState
           icon={UserCheck}
           title="No shortlisted candidates yet"
-          description="Review incoming applicants and shortlist candidates to view their direct contact information."
+          description="Review incoming applicants and shortlist candidates for the next recruitment stage."
         />
       ) : (
         <Table columns={columns} data={applicants} />

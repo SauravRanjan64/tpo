@@ -117,18 +117,6 @@ export async function seed() {
     },
   });
 
-  // Student 1 Resume
-  await db.resume.create({
-    data: {
-      studentId: student1.id,
-      fileName: 'Rahul_Sharma_CSE_Resume.pdf',
-      storageKey: `resumes/${student1.id}/rahul_resume.pdf`,
-      mimeType: 'application/pdf',
-      fileSize: 1468006,
-      skills: ['React', 'Node.js', 'Express', 'JavaScript', 'SQL', 'Git', 'Data Structures'],
-    },
-  });
-
   // 7. Student 2: Ineligible for Job 1 due to CGPA (6.4 < 7.0) and Backlog (1 > 0)
   const studentUser2 = await db.user.create({
     data: {

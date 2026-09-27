@@ -160,6 +160,12 @@ export const JobList = () => {
                     <span className="text-slate-500">Max Backlogs:</span>
                     <span className="font-semibold text-slate-800">{job.maxBacklogs}</span>
                   </div>
+                  {job.eligibleBatches?.length > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Eligible Batch:</span>
+                      <span className="font-semibold text-slate-800">{job.eligibleBatches.join(', ')}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 

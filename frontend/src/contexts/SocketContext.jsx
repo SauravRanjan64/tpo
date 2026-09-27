@@ -3,8 +3,6 @@ import { io } from 'socket.io-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from './AuthContext';
 import { useToast } from './ToastContext';
-import { subscribeMockSocket } from '../services/mock/mockAdapter';
-import { useMockTransport } from '../services/axiosClient';
 
 const SocketContext = createContext(null);
 
@@ -14,20 +12,12 @@ export const SocketProvider = ({ children }) => {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    // 1. In mock mode, subscribe to mock socket event dispatcher
-    const unsubscribeMock = subscribeMockSocket((event, payload) => {
-      handleSocketEvent(event, payload);
-    });
-
-    // 2. In live backend mode (if VITE_USE_MOCK === 'false'), connect via socket.io-client
     let socket = null;
-    if (!useMockTransport && user) {
+    if (user) {
       try {
         // Socket.io connects to the server root, not the /api path
         const serverRoot = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/api$/, '');
-        const token = localStorage.getItem('dcrust_token');
         socket = io(serverRoot, {
-          auth: { token },
           withCredentials: true,
           transports: ['websocket', 'polling'],
         });
@@ -52,13 +42,6 @@ export const SocketProvider = ({ children }) => {
       if (event === 'application:status-updated') {
         // Check if event belongs to current logged in student
         if (!user || user.id === data.studentId) {
-          showToast({
-            type: data.status === 'SHORTLISTED' || data.status === 'SELECTED' ? 'success' : 'info',
-            title: `Application Status: ${data.status}`,
-            message: data.message || `Your application for ${data.jobTitle} at ${data.companyName} has been ${data.status.toLowerCase()}.`,
-            duration: 6000,
-          });
-
           // Invalidate relevant TanStack Query caches to re-render automatically
           queryClient.invalidateQueries({ queryKey: ['my-applications'] });
           queryClient.invalidateQueries({ queryKey: ['application', data.applicationId] });
@@ -85,9 +68,7 @@ export const SocketProvider = ({ children }) => {
         }
       }
     }
-
     return () => {
-      unsubscribeMock();
       if (socket) {
         socket.disconnect();
       }

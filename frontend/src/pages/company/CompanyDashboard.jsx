@@ -97,7 +97,7 @@ export const CompanyDashboard = () => {
       <div className="p-4 bg-indigo-50/70 border border-indigo-200 rounded-xl text-xs text-indigo-900 flex items-center gap-3">
         <ShieldCheck className="w-5 h-5 text-indigo-600 shrink-0" />
         <p className="leading-relaxed">
-          <strong className="font-semibold">University Privacy Safeguard:</strong> Candidate mobile phone numbers remain masked until they are formally shortlisted by your recruitment team for interview rounds.
+          <strong className="font-semibold">University Privacy Safeguard:</strong> Candidate mobile phone numbers remain masked to protect student privacy.
         </p>
       </div>
 

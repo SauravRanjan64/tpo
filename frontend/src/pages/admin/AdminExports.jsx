@@ -62,13 +62,12 @@ export const AdminExports = () => {
         branch: selectedBranch,
         batch: selectedBatch,
       }),
-    onSuccess: (res) => {
+    onSuccess: ({ blob, filename }) => {
       // Trigger download
-      const blob = new Blob([res.csv], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.setAttribute('href', url);
-      link.setAttribute('download', res.filename || 'DCRUST_Candidates.csv');
+      link.setAttribute('download', filename);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

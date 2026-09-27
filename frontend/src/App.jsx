@@ -107,6 +107,7 @@ export const App = () => {
           <Route path="companies" element={<CompanyManagement />} />
           <Route path="jobs" element={<JobDriveManagement />} />
           <Route path="jobs/create" element={<CreateJobDrive />} />
+          <Route path="jobs/:id/edit" element={<CreateJobDrive />} />
           <Route path="applications" element={<AdminApplications />} />
           <Route path="analytics" element={<AdminAnalytics />} />
           <Route path="exports" element={<AdminExports />} />
@@ -127,6 +128,8 @@ export const App = () => {
           <Route index element={<Navigate to="/company/dashboard" replace />} />
           <Route path="dashboard" element={<CompanyDashboard />} />
           <Route path="jobs" element={<CompanyDrives />} />
+          <Route path="jobs/create" element={<CreateJobDrive />} />
+          <Route path="jobs/:id/edit" element={<CreateJobDrive />} />
           <Route path="applicants" element={<CompanyApplicants />} />
           <Route path="shortlisted" element={<CompanyShortlisted />} />
           <Route path="profile" element={<CompanyProfile />} />

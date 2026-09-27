@@ -72,7 +72,7 @@ export class AuthService {
       action: 'LOGIN',
       entityType: 'User',
       entityId: user.id,
-      metadata: { role: user.role, email: user.email },
+      metadata: { role: user.role },
       ipAddress: reqMeta.ipAddress,
       userAgent: reqMeta.userAgent,
     });

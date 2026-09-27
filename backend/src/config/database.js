@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import env from './env.js';
 import logger from './logger.js';
 
-// Seed dataset for in-memory / testing / offline fallback
+// Seed dataset used by isolated tests.
 export const initialSeedData = {
   users: [
     {
@@ -187,23 +187,11 @@ export const initialSeedData = {
   ],
   auditLogs: [],
   notifications: [],
-  resumes: [
-    {
-      id: 'res-1',
-      studentId: 'std-1',
-      fileName: 'Rahul_Sharma_CSE_Resume.pdf',
-      storageKey: 'resumes/std-1/rahul_resume.pdf',
-      mimeType: 'application/pdf',
-      fileSize: 1468006,
-      skills: ['React', 'Node.js', 'Express', 'JavaScript', 'SQL', 'Git', 'Data Structures'],
-      createdAt: new Date('2026-01-16'),
-      updatedAt: new Date(),
-    }
-  ],
+  resumes: [],
   resumeMatches: [],
 };
 
-// In-memory store used by tests and when MongoDB is unavailable locally.
+// In-memory store used only by isolated tests.
 class InMemoryStore {
   constructor() {
     this.reset();
@@ -417,6 +405,7 @@ class InMemoryStore {
           salaryMax: data.salaryMax,
           minCgpa: data.minCgpa,
           maxBacklogs: data.maxBacklogs ?? 0,
+          eligibleBatches: data.eligibleBatches || [],
           applicationStart: new Date(data.applicationStart),
           applicationEnd: new Date(data.applicationEnd),
           status: data.status || 'ACTIVE',
@@ -448,6 +437,36 @@ class InMemoryStore {
         let list = [...this.data.jobDrives];
         if (args.where?.status) list = list.filter(j => j.status === args.where.status);
         return list.length;
+      },
+    };
+  }
+
+  get jobBranch() {
+    return {
+      create: async ({ data }) => {
+        const record = { id: `jb-${Date.now()}-${randomUUID()}`, ...data };
+        this.data.jobBranches.push(record);
+        return record;
+      },
+      deleteMany: async ({ where }) => {
+        const before = this.data.jobBranches.length;
+        this.data.jobBranches = this.data.jobBranches.filter((branch) => branch.jobId !== where.jobId);
+        return { count: before - this.data.jobBranches.length };
+      },
+    };
+  }
+
+  get jobSkill() {
+    return {
+      create: async ({ data }) => {
+        const record = { id: `js-${Date.now()}-${randomUUID()}`, ...data };
+        this.data.jobSkills.push(record);
+        return record;
+      },
+      deleteMany: async ({ where }) => {
+        const before = this.data.jobSkills.length;
+        this.data.jobSkills = this.data.jobSkills.filter((skill) => skill.jobId !== where.jobId);
+        return { count: before - this.data.jobSkills.length };
       },
     };
   }
@@ -604,6 +623,7 @@ class InMemoryStore {
 
   get notification() {
     return {
+      findUnique: async ({ where }) => this.data.notifications.find((item) => item.id === where.id) || null,
       create: async ({ data }) => {
         const notif = {
           id: `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -719,19 +739,147 @@ const collections = {
   resume: 'resumes', resumeMatch: 'resume_matches',
 };
 
+const mixed = mongoose.Schema.Types.Mixed;
+const refs = {
+  user: 'Dcrustuser',
+  student: 'Dcruststudent',
+  company: 'Dcrustcompany',
+  jobDrive: 'DcrustjobDrive',
+  resume: 'Dcrustresume',
+};
+const fieldsByCollection = {
+  user: {
+    name: { type: String, required: true, trim: true },
+    email: { type: String, required: true, lowercase: true, trim: true },
+    passwordHash: { type: String, required: true, select: false },
+    role: { type: String, enum: ['STUDENT', 'ADMIN', 'COMPANY'], required: true },
+    isActive: { type: Boolean, default: true },
+    lastLoginAt: Date,
+  },
+  student: {
+    userId: { type: String, ref: refs.user, required: true },
+    rollNumber: { type: String, required: true, trim: true },
+    registrationNumber: String,
+    fullName: { type: String, required: true, trim: true },
+    branch: { type: String, required: true, uppercase: true, trim: true },
+    batch: { type: Number, required: true },
+    semester: Number,
+    cgpa: { type: Number, min: 0, max: 10, required: true },
+    activeBacklogs: { type: Number, min: 0, default: 0 },
+    phone: String,
+    graduationYear: Number,
+    profileComplete: { type: Boolean, default: false },
+  },
+  company: {
+    userId: { type: String, ref: refs.user, required: true },
+    companyName: { type: String, required: true, trim: true },
+    companyEmail: String,
+    industry: String,
+    website: String,
+    description: String,
+    verified: { type: Boolean, default: false },
+  },
+  jobDrive: {
+    companyId: { type: String, ref: refs.company, required: true },
+    title: { type: String, required: true, trim: true },
+    description: { type: String, required: true },
+    jobType: { type: String, default: 'Full-time' },
+    location: { type: String, required: true },
+    salaryMin: { type: Number, min: 0, required: true },
+    salaryMax: { type: Number, min: 0, required: true },
+    minCgpa: { type: Number, min: 0, max: 10, required: true },
+    maxBacklogs: { type: Number, min: 0, default: 0 },
+    eligibleBatches: { type: [Number], default: [] },
+    applicationStart: { type: Date, required: true },
+    applicationEnd: { type: Date, required: true },
+    status: { type: String, enum: ['DRAFT', 'ACTIVE', 'CLOSED'], default: 'ACTIVE' },
+  },
+  jobBranch: {
+    jobId: { type: String, ref: refs.jobDrive, required: true },
+    branch: { type: String, required: true, uppercase: true },
+  },
+  jobSkill: {
+    jobId: { type: String, ref: refs.jobDrive, required: true },
+    skill: { type: String, required: true, trim: true },
+  },
+  application: {
+    studentId: { type: String, ref: refs.student, required: true },
+    jobId: { type: String, ref: refs.jobDrive, required: true },
+    status: { type: String, enum: ['APPLIED', 'SHORTLISTED', 'SELECTED', 'REJECTED'], default: 'APPLIED' },
+    eligibilitySnapshot: { type: mixed, required: true },
+    resumeId: { type: String, ref: refs.resume, default: null },
+    matchScore: { type: Number, min: 0, max: 100, default: null },
+    appliedAt: { type: Date, default: Date.now },
+    shortlistedAt: Date,
+    rejectedAt: Date,
+    rejectionReason: String,
+  },
+  consent: {
+    studentId: { type: String, ref: refs.student, required: true },
+    consentType: { type: String, required: true },
+    version: { type: String, required: true },
+    accepted: { type: Boolean, required: true },
+    acceptedAt: Date,
+    withdrawnAt: Date,
+  },
+  auditLog: {
+    userId: { type: String, ref: refs.user },
+    action: { type: String, required: true },
+    entityType: { type: String, required: true },
+    entityId: String,
+    metadata: { type: mixed, default: {} },
+    ipAddress: String,
+    userAgent: String,
+  },
+  notification: {
+    userId: { type: String, ref: refs.user, required: true },
+    type: { type: String, required: true },
+    title: { type: String, required: true },
+    message: { type: String, required: true },
+    read: { type: Boolean, default: false },
+    readAt: Date,
+  },
+  resume: {
+    studentId: { type: String, ref: refs.student, required: true },
+    fileName: { type: String, required: true },
+    storageKey: { type: String, required: true },
+    mimeType: { type: String, required: true },
+    fileSize: { type: Number, min: 1, required: true },
+    skills: { type: [String], default: [] },
+  },
+  resumeMatch: {
+    resumeId: { type: String, ref: refs.resume, required: true },
+    jobId: { type: String, ref: refs.jobDrive, required: true },
+    score: { type: Number, min: 0, max: 100, required: true },
+    matchedSkills: { type: [String], default: [] },
+    missingSkills: { type: [String], default: [] },
+  },
+};
+
 const mongoModels = Object.fromEntries(Object.entries(collections).map(([name, collection]) => {
   const schema = new mongoose.Schema({
     id: { type: String, default: randomUUID, unique: true, index: true },
-  }, { collection, strict: false, versionKey: false });
+    ...fieldsByCollection[name],
+  }, { collection, strict: true, versionKey: false, timestamps: true });
   if (name === 'user') schema.index({ email: 1 }, { unique: true });
   if (name === 'student') {
     schema.index({ userId: 1 }, { unique: true });
     schema.index({ rollNumber: 1 }, { unique: true });
   }
   if (name === 'company') schema.index({ userId: 1 }, { unique: true });
-  if (name === 'application') schema.index({ studentId: 1, jobId: 1 }, { unique: true });
+  if (name === 'jobDrive') schema.index({ companyId: 1, status: 1, applicationEnd: 1 });
+  if (name === 'application') {
+    schema.index({ studentId: 1, jobId: 1 }, { unique: true });
+    schema.index({ jobId: 1, status: 1 });
+    schema.index({ studentId: 1, appliedAt: -1 });
+  }
   if (name === 'jobBranch') schema.index({ jobId: 1, branch: 1 }, { unique: true });
   if (name === 'jobSkill') schema.index({ jobId: 1, skill: 1 }, { unique: true });
+  if (name === 'consent') schema.index({ studentId: 1, consentType: 1, accepted: 1 });
+  if (name === 'notification') schema.index({ userId: 1, read: 1, createdAt: -1 });
+  if (name === 'resume') schema.index({ studentId: 1 }, { unique: true });
+  if (name === 'resumeMatch') schema.index({ resumeId: 1, jobId: 1 }, { unique: true });
+  if (name === 'auditLog') schema.index({ entityType: 1, entityId: 1, createdAt: -1 });
   return [name, mongoose.models[`Dcrust${name}`] || mongoose.model(`Dcrust${name}`, schema)];
 }));
 
@@ -744,7 +892,10 @@ const now = () => new Date();
  * stable while MongoDB stores the data in separate collections.
  */
 class MongoStore {
-  constructor(models) { this.models = models; }
+  constructor(models, session = null) {
+    this.models = models;
+    this.session = session;
+  }
 
   normaliseWhere(where = {}) {
     if (where.studentId_jobId) return where.studentId_jobId;
@@ -753,12 +904,14 @@ class MongoStore {
   async one(model, where, includePasswordHash = false) {
     const { includePasswordHash: ignoredOption, ...criteria } = where || {};
     const query = this.models[model].findOne(this.normaliseWhere(criteria));
-    if (model !== 'user' || !includePasswordHash) query.select('-passwordHash');
+    if (model === 'user' && includePasswordHash) query.select('+passwordHash');
+    if (this.session) query.session(this.session);
     return plain(await query.lean(false));
   }
   async many(model, where = {}) {
     const query = this.models[model].find(where);
     if (model !== 'user') query.select('-passwordHash');
+    if (this.session) query.session(this.session);
     return (await query.lean(false)).map(plain);
   }
   async addRelations(type, value, include = {}) {
@@ -785,11 +938,13 @@ class MongoStore {
       findFirst: async ({ where = {}, include } = {}) => {
         const query = model.findOne(this.normaliseWhere(where)).sort({ createdAt: -1 });
         if (type !== 'user') query.select('-passwordHash');
+        if (this.session) query.session(this.session);
         return this.addRelations(type, plain(await query), include);
       },
       findMany: async ({ where = {}, include, take } = {}) => {
         let query = model.find(this.normaliseWhere(where)).sort({ createdAt: -1 });
         if (type !== 'user') query.select('-passwordHash');
+        if (this.session) query.session(this.session);
         if (take) query = query.limit(take);
         const records = (await query).map(plain);
         return Promise.all(records.map(record => this.addRelations(type, record, include)));
@@ -797,31 +952,75 @@ class MongoStore {
       create: async ({ data }) => {
         const { branches, skills, ...documentData } = data;
         const record = { ...documentData, createdAt: data.createdAt || now(), updatedAt: data.updatedAt || now() };
-        const created = plain(await model.create(record));
+        const [createdDocument] = this.session
+          ? await model.create([record], { session: this.session })
+          : [await model.create(record)];
+        const created = plain(createdDocument);
         if (type === 'jobDrive') {
-          await Promise.all((branches?.create || []).map(branch => this.models.jobBranch.create({ ...branch, jobId: created.id })));
-          await Promise.all((skills?.create || []).map(skill => this.models.jobSkill.create({ ...skill, jobId: created.id })));
+          await Promise.all((branches?.create || []).map(branch => this.createRelated('jobBranch', { ...branch, jobId: created.id })));
+          await Promise.all((skills?.create || []).map(skill => this.createRelated('jobSkill', { ...skill, jobId: created.id })));
         }
         return this.addRelations(type, created, { branches: true, skills: true });
       },
       update: async ({ where, data }) => {
-        const updated = plain(await model.findOneAndUpdate(this.normaliseWhere(where), { $set: { ...data, updatedAt: now() } }, { new: true }));
+        const update = model.findOneAndUpdate(this.normaliseWhere(where), { $set: { ...data, updatedAt: now() } }, { new: true });
+        if (this.session) update.session(this.session);
+        const updated = plain(await update);
         if (!updated) throw new Error(`${type} not found`);
         return this.addRelations(type, updated, { branches: true, skills: true });
       },
-      delete: async ({ where }) => plain(await model.findOneAndDelete(this.normaliseWhere(where))),
-      count: async ({ where = {} } = {}) => model.countDocuments(this.normaliseWhere(where)),
+      updateMany: async ({ where = {}, data }) => {
+        const update = model.updateMany(this.normaliseWhere(where), { $set: { ...data, updatedAt: now() } });
+        if (this.session) update.session(this.session);
+        return update;
+      },
+      delete: async ({ where }) => {
+        const deletion = model.findOneAndDelete(this.normaliseWhere(where));
+        if (this.session) deletion.session(this.session);
+        return plain(await deletion);
+      },
+      deleteMany: async ({ where = {} }) => {
+        const deletion = model.deleteMany(this.normaliseWhere(where));
+        if (this.session) deletion.session(this.session);
+        return deletion;
+      },
+      count: async ({ where = {} } = {}) => {
+        const count = model.countDocuments(this.normaliseWhere(where));
+        if (this.session) count.session(this.session);
+        return count;
+      },
     };
+  }
+  async createRelated(type, data) {
+    const record = { ...data, createdAt: now(), updatedAt: now() };
+    if (this.session) {
+      const [created] = await this.models[type].create([record], { session: this.session });
+      return created;
+    }
+    return this.models[type].create(record);
   }
   get user() { return this.resource('user'); } get student() { return this.resource('student'); }
   get company() { return this.resource('company'); } get jobDrive() { return this.resource('jobDrive'); }
+  get jobBranch() { return this.resource('jobBranch'); } get jobSkill() { return this.resource('jobSkill'); }
   get application() { return this.resource('application'); } get consent() { return this.resource('consent'); }
   get auditLog() { return this.resource('auditLog'); } get notification() { return this.resource('notification'); }
   get resume() { return this.resource('resume'); } get resumeMatch() { return this.resource('resumeMatch'); }
-  async $transaction(fn) { return typeof fn === 'function' ? fn(this) : Promise.all(fn); }
+  async $transaction(fn) {
+    if (typeof fn !== 'function') return Promise.all(fn);
+    const session = await mongoose.startSession();
+    try {
+      let result;
+      await session.withTransaction(async () => {
+        result = await fn(new MongoStore(this.models, session));
+      });
+      return result;
+    } finally {
+      await session.endSession();
+    }
+  }
 }
 
-// In non-test environments, connect to MongoDB. Tests remain isolated in memory.
+// Tests use an isolated in-memory store; application environments require MongoDB.
 let databaseConnection = Promise.resolve();
 if (env.NODE_ENV !== 'test') {
   databaseConnection = mongoose.connect(env.MONGODB_URI, { serverSelectionTimeoutMS: 5000 })
@@ -830,12 +1029,8 @@ if (env.NODE_ENV !== 'test') {
       logger.info('Connected to MongoDB database.');
     })
     .catch((error) => {
-      if (env.NODE_ENV === 'production') {
-        logger.error('MongoDB connection failed; production storage is unavailable.');
-        throw error;
-      }
-      logger.warn('MongoDB is not currently reachable; using in-memory store.');
-      activeDb = memoryDb;
+      logger.error({ message: error.message }, 'MongoDB connection failed; refusing to start without persistent storage.');
+      throw error;
     });
 }
 

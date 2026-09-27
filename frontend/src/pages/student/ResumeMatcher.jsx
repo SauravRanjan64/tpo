@@ -47,7 +47,15 @@ export const ResumeMatcher = () => {
         jobId: selectedJobId,
       }),
     onSuccess: (res) => {
-      setMatchResult(res);
+      const match = res.match;
+      setMatchResult({
+        ...match,
+        matchScore: match.score,
+        targetJob: {
+          title: match.jobTitle,
+          companyName: jobs.find((job) => job.id === match.jobId)?.companyName,
+        },
+      });
     },
   });
 

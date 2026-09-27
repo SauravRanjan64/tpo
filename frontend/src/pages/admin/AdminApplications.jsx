@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import adminApi from '../../services/adminApi';
+import { useToast } from '../../contexts/ToastContext';
 import Table from '../../components/common/Table';
 import Badge from '../../components/common/Badge';
 import SearchBox from '../../components/common/SearchBox';
 import Filter from '../../components/common/Filter';
+import Button from '../../components/common/Button';
 import { TableSkeleton } from '../../components/common/LoadingSkeleton';
 import EmptyState from '../../components/common/EmptyState';
 import ErrorState from '../../components/common/ErrorState';
-import { FileCheck, Search } from 'lucide-react';
+import { FileCheck, Check, X } from 'lucide-react';
 
 const STATUS_OPTIONS = [
   { value: 'ALL', label: 'All Statuses' },
@@ -19,25 +21,37 @@ const STATUS_OPTIONS = [
 ];
 
 export const AdminApplications = () => {
+  const queryClient = useQueryClient();
+  const { showToast } = useToast();
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('ALL');
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['admin-applications', { status }],
-    queryFn: () => adminApi.getApplications({ status }),
+    queryKey: ['admin-applications', { status, search }],
+    queryFn: () => adminApi.getApplications({ status, search: search || undefined }),
   });
 
   const applications = data?.applications || [];
 
-  const filtered = applications.filter((app) => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return (
-      app.studentName?.toLowerCase().includes(q) ||
-      app.rollNumber?.includes(q) ||
-      app.companyName?.toLowerCase().includes(q) ||
-      app.jobTitle?.toLowerCase().includes(q)
-    );
+  const statusMutation = useMutation({
+    mutationFn: ({ applicationId, nextStatus }) =>
+      adminApi.updateApplicationStatus(applicationId, nextStatus),
+    onSuccess: (_, { nextStatus }) => {
+      showToast({
+        type: 'success',
+        title: `Application ${nextStatus.toLowerCase()}`,
+        message: 'The student has been notified of this update.',
+      });
+      queryClient.invalidateQueries({ queryKey: ['admin-applications'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-stats'] });
+    },
+    onError: (err) => {
+      showToast({
+        type: 'error',
+        title: 'Status update failed',
+        message: err.response?.data?.message || 'Could not update this application.',
+      });
+    },
   });
 
   const columns = [
@@ -81,10 +95,10 @@ export const AdminApplications = () => {
     },
     {
       header: 'Applied Date',
-      accessor: 'appliedOn',
+      accessor: 'appliedAt',
       render: (row) => (
         <span className="text-xs text-slate-500">
-          {new Date(row.appliedOn).toLocaleDateString('en-IN', {
+          {new Date(row.appliedAt).toLocaleDateString('en-IN', {
             day: 'numeric',
             month: 'short',
             year: 'numeric',
@@ -96,6 +110,46 @@ export const AdminApplications = () => {
       header: 'Current Status',
       accessor: 'status',
       render: (row) => <Badge status={row.status} size="sm" showDot />,
+    },
+    {
+      header: 'T&P Action',
+      align: 'right',
+      render: (row) => (
+        <div className="flex gap-2 justify-end">
+          {row.status === 'APPLIED' && (
+            <>
+              <Button
+                size="sm"
+                variant="success"
+                leftIcon={Check}
+                isLoading={statusMutation.isPending && statusMutation.variables?.applicationId === row.id}
+                onClick={() => statusMutation.mutate({ applicationId: row.id, nextStatus: 'SHORTLISTED' })}
+              >
+                Shortlist
+              </Button>
+              <Button
+                size="sm"
+                variant="danger"
+                leftIcon={X}
+                onClick={() => statusMutation.mutate({ applicationId: row.id, nextStatus: 'REJECTED' })}
+              >
+                Reject
+              </Button>
+            </>
+          )}
+          {row.status === 'SHORTLISTED' && (
+            <Button
+              size="sm"
+              variant="primary"
+              leftIcon={Check}
+              isLoading={statusMutation.isPending && statusMutation.variables?.applicationId === row.id}
+              onClick={() => statusMutation.mutate({ applicationId: row.id, nextStatus: 'SELECTED' })}
+            >
+              Select
+            </Button>
+          )}
+        </div>
+      ),
     },
   ];
 
@@ -133,14 +187,14 @@ export const AdminApplications = () => {
           message="Could not retrieve application submissions."
           onRetry={refetch}
         />
-      ) : filtered.length === 0 ? (
+      ) : applications.length === 0 ? (
         <EmptyState
           icon={FileCheck}
           title="No applications found"
           description="No student applications matched your criteria."
         />
       ) : (
-        <Table columns={columns} data={filtered} />
+        <Table columns={columns} data={applications} />
       )}
     </div>
   );

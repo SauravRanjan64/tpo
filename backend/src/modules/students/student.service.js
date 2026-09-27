@@ -1,5 +1,6 @@
 import { db } from '../../config/database.js';
 import AuditService from '../audit/audit.service.js';
+import { evaluateEligibility } from '../eligibility/eligibility.service.js';
 
 export class StudentService {
   /**
@@ -48,11 +49,18 @@ export class StudentService {
       throw new Error('Student profile not found.');
     }
 
+    const updatedProfile = { ...student, ...updateData };
+    const requiredProfileFields = ['fullName', 'rollNumber', 'branch', 'batch', 'cgpa', 'phone'];
+    const profileComplete = requiredProfileFields.every((field) => {
+      const value = updatedProfile[field];
+      return value !== undefined && value !== null && String(value).trim() !== '';
+    });
+
     const updatedStudent = await db.student.update({
       where: { id: student.id },
       data: {
         ...updateData,
-        profileComplete: true, // Mark profile complete once updated
+        profileComplete,
       },
     });
 
@@ -62,7 +70,7 @@ export class StudentService {
       action: 'PROFILE_UPDATED',
       entityType: 'Student',
       entityId: student.id,
-      metadata: updateData,
+      metadata: Object.keys(updateData),
       ipAddress: reqMeta.ipAddress,
       userAgent: reqMeta.userAgent,
     });
@@ -93,12 +101,15 @@ export class StudentService {
 
     let eligibleJobsCount = 0;
     if (student) {
+      const activeConsent = await db.consent.findFirst({
+        where: { studentId: student.id, accepted: true },
+      });
       for (const job of activeJobs) {
-        const branches = job.branches?.map(b => b.branch.toUpperCase()) || [];
-        const matchesBranch = branches.length === 0 || branches.includes(student.branch.toUpperCase());
-        const meetsCgpa = student.cgpa >= job.minCgpa;
-        const meetsBacklogs = student.activeBacklogs <= job.maxBacklogs;
-        if (matchesBranch && meetsCgpa && meetsBacklogs) {
+        const hasApplied = applications.some((application) => application.jobId === job.id);
+        if (evaluateEligibility(student, job, {
+          hasConsent: Boolean(activeConsent),
+          hasApplied,
+        }).eligible) {
           eligibleJobsCount++;
         }
       }

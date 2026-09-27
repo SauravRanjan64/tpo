@@ -3,8 +3,8 @@ import { evaluateEligibility } from '../eligibility/eligibility.service.js';
 import AuditService from '../audit/audit.service.js';
 
 export class JobService {
-  static async getJobs(query = {}) {
-    const { page = 1, limit = 20, search, branch, status: rawStatus = 'ACTIVE' } = query;
+  static async getJobs(query = {}, userRole = 'PUBLIC') {
+    const { page = 1, limit = 20, search, branch, jobType, status: rawStatus = 'ACTIVE' } = query;
     const status = rawStatus === 'ALL' ? undefined : rawStatus;
 
     let jobs = await db.jobDrive.findMany({
@@ -15,6 +15,7 @@ export class JobService {
         skills: true,
       },
     });
+    if (userRole !== 'ADMIN') jobs = jobs.filter((job) => job.status !== 'DRAFT');
 
     // In-database / in-memory search filtering
     if (search) {
@@ -31,6 +32,9 @@ export class JobService {
     if (branch && branch !== 'ALL') {
       const bQuery = branch.toUpperCase();
       jobs = jobs.filter(j => j.branches?.some(b => b.branch.toUpperCase() === bQuery));
+    }
+    if (jobType && jobType !== 'ALL') {
+      jobs = jobs.filter((job) => job.jobType?.toLowerCase() === jobType.toLowerCase());
     }
 
     const total = jobs.length;
@@ -61,12 +65,24 @@ export class JobService {
   }
 
   static async createJob(jobData, userId, reqMeta = {}, userRole = 'ADMIN') {
-    // Resolve companyId: if user is COMPANY, lookup company. If ADMIN, can pass companyId
-    let companyId = jobData.companyId;
-    if (userRole === 'COMPANY' || !companyId) {
+    let companyId;
+    if (userRole === 'COMPANY') {
       const company = await db.company.findUnique({ where: { userId } });
       if (!company) {
         throw new Error('Company profile not found for user.');
+      }
+      companyId = company.id;
+    } else {
+      if (!jobData.companyId) {
+        const error = new Error('Select a company for this Job Drive.');
+        error.status = 400;
+        throw error;
+      }
+      const company = await db.company.findUnique({ where: { id: jobData.companyId } });
+      if (!company) {
+        const error = new Error('Selected company was not found.');
+        error.status = 400;
+        throw error;
       }
       companyId = company.id;
     }
@@ -74,8 +90,9 @@ export class JobService {
     const branchesCreate = (jobData.branches || []).map(branch => ({ branch: branch.trim().toUpperCase() }));
     const skillsCreate = (jobData.skills || []).map(skill => ({ skill: skill.trim() }));
 
-    const job = await db.jobDrive.create({
-      data: {
+    const job = await db.$transaction(async (tx) => {
+      const created = await tx.jobDrive.create({
+        data: {
         companyId,
         title: jobData.title,
         description: jobData.description,
@@ -85,6 +102,7 @@ export class JobService {
         salaryMax: jobData.salaryMax,
         minCgpa: jobData.minCgpa,
         maxBacklogs: jobData.maxBacklogs ?? 0,
+        eligibleBatches: jobData.eligibleBatches || [],
         applicationStart: new Date(jobData.applicationStart),
         applicationEnd: new Date(jobData.applicationEnd),
         status: jobData.status || 'ACTIVE',
@@ -94,24 +112,26 @@ export class JobService {
         skills: {
           create: skillsCreate,
         },
-      },
-    });
+        },
+      });
 
-    // Record audit log
-    await AuditService.record({
-      userId,
-      action: 'JOB_CREATED',
-      entityType: 'JobDrive',
-      entityId: job.id,
-      metadata: { title: job.title, companyId },
-      ipAddress: reqMeta.ipAddress,
-      userAgent: reqMeta.userAgent,
+      await AuditService.record({
+        userId,
+        action: 'JOB_CREATED',
+        entityType: 'JobDrive',
+        entityId: created.id,
+        metadata: { title: created.title, companyId },
+        ipAddress: reqMeta.ipAddress,
+        userAgent: reqMeta.userAgent,
+      }, tx);
+      return created;
     });
 
     return job;
   }
 
   static async updateJob(id, updateData, userId, reqMeta = {}, userRole = 'ADMIN') {
+    const { branches, skills, ...jobFields } = updateData;
     const job = await db.jobDrive.findUnique({ where: { id } });
     if (!job) {
       throw new Error('Job drive not found.');
@@ -125,22 +145,49 @@ export class JobService {
         throw error;
       }
       // A company cannot transfer a drive to another company.
-      delete updateData.companyId;
+      delete jobFields.companyId;
+    } else if (jobFields.companyId) {
+      const company = await db.company.findUnique({ where: { id: jobFields.companyId } });
+      if (!company) {
+        const error = new Error('Selected company was not found.');
+        error.status = 400;
+        throw error;
+      }
     }
 
-    const updatedJob = await db.jobDrive.update({
-      where: { id },
-      data: updateData,
-    });
+    const updatedJob = await db.$transaction(async (tx) => {
+      await tx.jobDrive.update({
+        where: { id },
+        data: jobFields,
+      });
 
-    await AuditService.record({
-      userId,
-      action: 'JOB_UPDATED',
-      entityType: 'JobDrive',
-      entityId: id,
-      metadata: updateData,
-      ipAddress: reqMeta.ipAddress,
-      userAgent: reqMeta.userAgent,
+      if (branches) {
+        await tx.jobBranch.deleteMany({ where: { jobId: id } });
+        await Promise.all(branches.map((branch) => tx.jobBranch.create({
+          data: { jobId: id, branch: branch.trim().toUpperCase() },
+        })));
+      }
+      if (skills) {
+        await tx.jobSkill.deleteMany({ where: { jobId: id } });
+        await Promise.all(skills.map((skill) => tx.jobSkill.create({
+          data: { jobId: id, skill: skill.trim() },
+        })));
+      }
+
+      await AuditService.record({
+        userId,
+        action: 'JOB_UPDATED',
+        entityType: 'JobDrive',
+        entityId: id,
+        metadata: Object.keys({ ...jobFields, branches, skills }),
+        ipAddress: reqMeta.ipAddress,
+        userAgent: reqMeta.userAgent,
+      }, tx);
+
+      return tx.jobDrive.findUnique({
+        where: { id },
+        include: { company: true, branches: true, skills: true },
+      });
     });
 
     return updatedJob;

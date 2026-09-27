@@ -1,9 +1,13 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useForm, Controller } from 'react-hook-form';
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import { useQuery } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import adminApi from '../../services/adminApi';
+import companyApi from '../../services/companyApi';
+import jobApi from '../../services/jobApi';
+import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import Card from '../../components/common/Card';
 import Input from '../../components/common/Input';
@@ -13,7 +17,7 @@ import Button from '../../components/common/Button';
 import { ArrowLeft, CheckCircle2, ChevronRight, Briefcase, Award } from 'lucide-react';
 
 const jobSchema = z.object({
-  companyName: z.string().min(2, 'Company name is required'),
+  companyId: z.string().min(1, 'Select a company'),
   title: z.string().min(2, 'Job title is required'),
   location: z.string().min(2, 'Job location is required'),
   jobType: z.string().min(1, 'Please select job type'),
@@ -47,7 +51,20 @@ const BATCH_OPTIONS = [
 
 export const CreateJobDrive = () => {
   const navigate = useNavigate();
+  const { id } = useParams();
   const { showToast } = useToast();
+  const { role } = useAuth();
+  const isAdmin = role === 'ADMIN';
+  const companiesQuery = useQuery({
+    queryKey: ['admin-companies'],
+    queryFn: adminApi.getCompanies,
+    enabled: isAdmin,
+  });
+  const jobQuery = useQuery({
+    queryKey: ['job-details', id],
+    queryFn: () => jobApi.getJobById(id),
+    enabled: Boolean(id),
+  });
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -56,11 +73,12 @@ export const CreateJobDrive = () => {
     handleSubmit,
     watch,
     setValue,
+    reset,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(jobSchema),
     defaultValues: {
-      companyName: '',
+      companyId: isAdmin ? '' : 'self',
       title: '',
       location: 'Gurugram / Noida',
       jobType: 'Full-Time',
@@ -75,6 +93,26 @@ export const CreateJobDrive = () => {
       applicationEnd: '2026-10-05',
     },
   });
+
+  useEffect(() => {
+    if (!jobQuery.data?.job) return;
+    const job = jobQuery.data.job;
+    reset({
+      companyId: job.companyId || '',
+      title: job.title || '',
+      location: job.location || '',
+      jobType: job.jobType || 'Full-Time',
+      salaryRange: job.salaryRange || '',
+      minCgpa: job.minCgpa ?? 0,
+      maxBacklogs: job.maxBacklogs ?? 0,
+      allowedBranches: job.allowedBranches || [],
+      eligibleBatch: job.eligibleBatches?.[0] || 2025,
+      description: job.description || '',
+      requiredSkills: (job.requiredSkills || []).join(', '),
+      applicationStart: job.applicationStart ? new Date(job.applicationStart).toISOString().slice(0, 10) : '',
+      applicationEnd: job.applicationEnd ? new Date(job.applicationEnd).toISOString().slice(0, 10) : '',
+    });
+  }, [jobQuery.data, reset]);
 
   const formValues = watch();
 
@@ -95,15 +133,28 @@ export const CreateJobDrive = () => {
         .map((s) => s.trim())
         .filter(Boolean);
 
-      await adminApi.createJobDrive({
+      const payload = {
         ...data,
         requiredSkills: skillsArray,
-      });
+      };
+      if (id) {
+        await jobApi.updateJob(id, payload);
+      } else if (isAdmin) {
+        await adminApi.createJobDrive(payload);
+      } else {
+        await jobApi.createJob(payload);
+      }
+
+      const companyName = companiesQuery.data?.companies?.find(
+        (company) => company.id === data.companyId
+      )?.companyName || 'your company';
 
       showToast({
         type: 'success',
-        title: 'Placement Drive Published',
-        message: `${data.title} for ${data.companyName} is now live!`,
+        title: id ? 'Job Drive Updated' : 'Placement Drive Published',
+        message: id
+          ? `${data.title} has been updated.`
+          : `${data.title} for ${companyName} is now live!`,
       });
       navigate('/admin/jobs');
     } catch (err) {
@@ -138,7 +189,7 @@ export const CreateJobDrive = () => {
 
       <div>
         <h2 className="text-xl font-bold text-slate-900 tracking-tight">
-          Create Placement Drive
+          {id ? 'Edit Job Drive' : 'Create Placement Drive'}
         </h2>
         <p className="text-xs text-slate-500 mt-0.5">
           Configure visiting employer details, academic cutoffs, and application window.
@@ -181,13 +232,21 @@ export const CreateJobDrive = () => {
         {currentStep === 1 && (
           <Card title="Section 1: Basic Information" subtitle="Employer and position fundamentals">
             <div className="space-y-4">
-              <Input
-                label="Company Name"
-                {...register('companyName')}
-                error={errors.companyName?.message}
-                placeholder="e.g. ABC Technologies"
-                required
-              />
+              {isAdmin ? (
+                <Select
+                  label="Company"
+                  options={(companiesQuery.data?.companies || []).map((company) => ({
+                    value: company.id,
+                    label: company.companyName,
+                  }))}
+                  {...register('companyId')}
+                  error={errors.companyId?.message}
+                  helperText={companiesQuery.isLoading ? 'Loading companies…' : undefined}
+                  required
+                />
+              ) : (
+                <p className="text-xs text-slate-600">This Job Drive will be published under your company account.</p>
+              )}
               <Input
                 label="Job Designation / Title"
                 {...register('title')}
@@ -338,7 +397,11 @@ export const CreateJobDrive = () => {
             <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3 text-xs">
               <div className="flex justify-between border-b border-slate-200/80 pb-2">
                 <span className="text-slate-500 font-medium">Company:</span>
-                <span className="font-bold text-slate-900">{formValues.companyName || '—'}</span>
+                <span className="font-bold text-slate-900">
+                  {isAdmin
+                    ? companiesQuery.data?.companies?.find((company) => company.id === formValues.companyId)?.companyName || '—'
+                    : 'Your company'}
+                </span>
               </div>
               <div className="flex justify-between border-b border-slate-200/80 pb-2">
                 <span className="text-slate-500 font-medium">Designation:</span>
@@ -405,7 +468,7 @@ export const CreateJobDrive = () => {
               isLoading={isSubmitting}
               leftIcon={CheckCircle2}
             >
-              Create Job Drive
+              {id ? 'Save Changes' : 'Create Job Drive'}
             </Button>
           )}
         </div>

@@ -5,21 +5,6 @@ import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
 import { GraduationCap, Eye, EyeOff, Lock, Mail, ShieldAlert, ArrowRight } from 'lucide-react';
 
-const demoAccounts = {
-  STUDENT: [
-    { label: 'Rahul Sharma', desc: 'CSE • 8.2 CGPA • 0 backlogs', email: 'student@dcrust.ac.in', password: 'Student@123' },
-    { label: 'Priya Verma', desc: 'ECE • 6.4 CGPA • 1 backlog', email: 'priya@dcrust.ac.in', password: 'Student@123' },
-    { label: 'Aman Malik', desc: 'Mechanical • consent test', email: 'aman@dcrust.ac.in', password: 'Student@123' },
-    { label: 'Neha Gupta', desc: 'IT • 8.9 CGPA • 0 backlogs', email: 'neha@dcrust.ac.in', password: 'Student@123' },
-  ],
-  COMPANY: [
-    { label: 'Rajesh Mittal', desc: 'ABC Technologies recruiter', email: 'recruiter@tcs.com', password: 'Recruiter@123' },
-  ],
-  ADMIN: [
-    { label: 'Prof. S. K. Garg', desc: 'Head, Training & Placement', email: 'admin@dcrust.edu.in', password: 'Admin@123' },
-  ],
-};
-
 export const LoginPage = () => {
   const { login, isLoading } = useAuth();
   const navigate = useNavigate();
@@ -39,12 +24,6 @@ export const LoginPage = () => {
 
   const handleRoleChange = (role) => {
     setActiveRole(role);
-    setError('');
-  };
-
-  const selectDemoAccount = (account) => {
-    setEmail(account.email);
-    setPassword(account.password);
     setError('');
   };
 
@@ -186,26 +165,6 @@ export const LoginPage = () => {
               </Button>
             </div>
           </form>
-
-          <div className="mt-6 border-t border-slate-100 pt-5">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Demo accounts</p>
-              <span className="text-[11px] text-slate-400">Click to autofill</span>
-            </div>
-            <div className="max-h-48 space-y-2 overflow-y-auto pr-1">
-              {demoAccounts[activeRole].map((account) => (
-                <button
-                  key={account.email}
-                  type="button"
-                  onClick={() => selectDemoAccount(account)}
-                  className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left transition-colors hover:border-indigo-300 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
-                >
-                  <span className="block text-xs font-semibold text-slate-800">{account.label}</span>
-                  <span className="block text-[11px] text-slate-500">{account.desc}</span>
-                </button>
-              ))}
-            </div>
-          </div>
 
           <div className="mt-6 pt-6 border-t border-slate-100 text-center">
             <p className="text-xs text-slate-500">
