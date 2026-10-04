@@ -9,6 +9,7 @@ import notificationRoutes from '../modules/notifications/notification.routes.js'
 import adminRoutes from '../modules/admin/admin.routes.js';
 import analyticsRoutes from '../modules/analytics/analytics.routes.js';
 import auditRoutes from '../modules/audit/audit.routes.js';
+import eligibilityRoutes from '../modules/eligibility/eligibility.routes.js';
 import { db, getDatabaseStatus } from '../config/database.js';
 
 const router = Router();
@@ -44,5 +45,7 @@ router.use('/notifications', notificationRoutes);
 router.use('/admin', adminRoutes);
 router.use('/analytics', analyticsRoutes);
 router.use('/audit', auditRoutes);
+
+router.use('/eligibility', eligibilityRoutes);
 
 export default router;

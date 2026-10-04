@@ -134,7 +134,7 @@ export const CompanyApplicants = () => {
       accessor: 'matchScore',
       render: (row) => (
         <span className="text-xs font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded">
-          {row.matchScore}%
+          {row.matchScore == null ? '—' : `${row.matchScore}%`}
         </span>
       ),
     },

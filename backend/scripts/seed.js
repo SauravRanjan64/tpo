@@ -1,8 +1,14 @@
 import bcrypt from 'bcryptjs';
-import { db } from '../src/config/database.js';
+import { connectToDatabase, db } from '../src/config/database.js';
 
 export async function seed() {
   console.log('Seeding DCRUST Campus Placement & Eligibility Portal database...');
+
+  const existingAdmin = await db.user.findUnique({ where: { email: 'admin@dcrust.edu.in' } });
+  if (existingAdmin) {
+    console.log('Seed data already present. Skipping duplicate insert.');
+    return;
+  }
 
   // 1. Password Hashes
   const adminPassword = await bcrypt.hash('Admin@123', 10);
@@ -56,6 +62,7 @@ export async function seed() {
       salaryMax: 1000000,
       minCgpa: 7.0,
       maxBacklogs: 0,
+      eligibleBatches: [2025],
       applicationStart: new Date('2026-01-01'),
       applicationEnd: new Date('2026-12-31'),
       status: 'ACTIVE',
@@ -187,7 +194,8 @@ export async function seed() {
 
 // Auto-run if invoked directly
 if (process.argv[1]?.endsWith('seed.js')) {
-  seed()
+  connectToDatabase()
+    .then(() => seed())
     .then(() => process.exit(0))
     .catch((err) => {
       console.error('Seed error:', err);

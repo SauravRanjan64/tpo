@@ -12,17 +12,23 @@ import { CardSkeleton } from '../../components/common/LoadingSkeleton';
 import ErrorState from '../../components/common/ErrorState';
 import {
   ArrowLeft,
-  Building2,
   MapPin,
-  Calendar,
   IndianRupee,
   CheckCircle2,
   XCircle,
-  HelpCircle,
-  Clock,
-  Sparkles,
   Award
 } from 'lucide-react';
+
+const formatDriveDate = (value) => {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+};
 
 export const JobDetails = () => {
   const { id } = useParams();
@@ -47,7 +53,7 @@ export const JobDetails = () => {
     setIsCheckingEligibility(true);
     try {
       const res = await jobApi.checkEligibility(id);
-      setEligibilityResult(res);
+      setEligibilityResult(res?.eligible !== undefined ? res : res?.result || res);
       if (res.eligible) {
         showToast({
           type: 'success',
@@ -151,15 +157,15 @@ export const JobDetails = () => {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 py-4 border-b border-slate-100 text-xs">
           <div>
             <span className="text-slate-400 font-semibold uppercase text-[10px] block">Application Opens</span>
-            <span className="font-medium text-slate-800">{job.applicationStart}</span>
+            <span className="font-medium text-slate-800">{formatDriveDate(job.applicationStart)}</span>
           </div>
           <div>
             <span className="text-slate-400 font-semibold uppercase text-[10px] block">Application Deadline</span>
-            <span className="font-medium text-slate-800">{job.applicationEnd}</span>
+            <span className="font-medium text-slate-800">{formatDriveDate(job.applicationEnd)}</span>
           </div>
           <div>
             <span className="text-slate-400 font-semibold uppercase text-[10px] block">Eligible Batch</span>
-            <span className="font-medium text-slate-800">Batch of {job.eligibleBatch}</span>
+            <span className="font-medium text-slate-800">{job.eligibleBatches?.length ? job.eligibleBatches.map((batch) => `Batch ${batch}`).join(', ') : 'All batches'}</span>
           </div>
           <div>
             <span className="text-slate-400 font-semibold uppercase text-[10px] block">Minimum CGPA</span>
@@ -286,7 +292,8 @@ export const JobDetails = () => {
             )}
 
             {/* Criteria Breakdown Grid */}
-            {eligibilityResult.details && <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+            {eligibilityResult.details?.cgpa && eligibilityResult.details?.branch && eligibilityResult.details?.backlogs && eligibilityResult.details?.batch && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
               {/* CGPA */}
               <div
                 className={`p-3 rounded-lg border ${
@@ -328,7 +335,7 @@ export const JobDetails = () => {
                   )}
                 </div>
                 <div className="text-slate-600 truncate">
-                  Allowed: {eligibilityResult.details.branch.allowed.join(', ')}
+                  Allowed: {(eligibilityResult.details.branch.allowed || []).join(', ') || '—'}
                 </div>
                 <div className="font-semibold mt-0.5">
                   Your Branch: {eligibilityResult.details.branch.student}
@@ -382,7 +389,8 @@ export const JobDetails = () => {
                   Your Batch: {eligibilityResult.details.batch.student}
                 </div>
               </div>
-            </div>}
+            </div>
+            )}
 
             {/* Ineligibility Reason List if any */}
             {!eligibilityResult.eligible && eligibilityResult.reasons?.length > 0 && (
@@ -434,7 +442,7 @@ export const JobDetails = () => {
         onClose={() => setShowApplyModal(false)}
         onConfirm={() => applyMutation.mutate()}
         title={`Apply for ${job.title}?`}
-        description={`Your academic profile, verified CGPA (${eligibilityResult?.details?.cgpa?.student}), and primary resume will be submitted to the T&P Cell for ${job.companyName}.`}
+        description={`Your academic profile and primary resume will be submitted to the T&P Cell for ${job.companyName}.`}
         confirmText="Confirm Apply"
         cancelText="Cancel"
         variant="primary"

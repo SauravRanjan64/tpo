@@ -107,4 +107,12 @@ describe('Eligibility Engine Unit Tests (Rules Version V2)', () => {
     expect(snapshot.allowedBranches).toEqual(['CSE', 'ECE', 'IT']);
     expect(snapshot.eligible).toBe(true);
   });
+
+  test('Eligibility result includes criterion details for the student UI', () => {
+    const result = evaluateEligibility(baseStudent, baseJob, { hasApplied: false, hasConsent: true });
+    expect(result.details.cgpa).toEqual({ required: 7, student: 8, pass: true });
+    expect(result.details.branch.allowed).toEqual(['CSE', 'ECE', 'IT']);
+    expect(result.details.branch.pass).toBe(true);
+    expect(result.details.backlogs.pass).toBe(true);
+  });
 });

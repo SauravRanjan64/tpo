@@ -5,19 +5,17 @@ import { useQuery } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import adminApi from '../../services/adminApi';
-import companyApi from '../../services/companyApi';
 import jobApi from '../../services/jobApi';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import Card from '../../components/common/Card';
 import Input from '../../components/common/Input';
 import Select from '../../components/common/Select';
-import Checkbox from '../../components/common/Checkbox';
 import Button from '../../components/common/Button';
-import { ArrowLeft, CheckCircle2, ChevronRight, Briefcase, Award } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, ChevronRight } from 'lucide-react';
 
 const jobSchema = z.object({
-  companyId: z.string().min(1, 'Select a company'),
+  companyId: z.string().min(1, 'Select a visiting company').optional(),
   title: z.string().min(2, 'Job title is required'),
   location: z.string().min(2, 'Job location is required'),
   jobType: z.string().min(1, 'Please select job type'),
@@ -43,11 +41,15 @@ const JOB_TYPES = [
 ];
 
 const BATCH_OPTIONS = [
-  { value: '2024', label: 'Batch 2024' },
-  { value: '2025', label: 'Batch 2025' },
-  { value: '2026', label: 'Batch 2026' },
-  { value: '2027', label: 'Batch 2027' },
+  ...Array.from({ length: 12 }, (_, index) => 2024 + index).map((batch) => ({
+    value: String(batch),
+    label: `Batch ${batch}`,
+  })),
 ];
+
+const today = new Date();
+const defaultStartDate = new Date(today.getTime() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+const defaultEndDate = new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
 export const CreateJobDrive = () => {
   const navigate = useNavigate();
@@ -74,11 +76,12 @@ export const CreateJobDrive = () => {
     watch,
     setValue,
     reset,
+    trigger,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(jobSchema),
     defaultValues: {
-      companyId: isAdmin ? '' : 'self',
+      companyId: isAdmin ? '' : undefined,
       title: '',
       location: 'Gurugram / Noida',
       jobType: 'Full-Time',
@@ -89,8 +92,8 @@ export const CreateJobDrive = () => {
       eligibleBatch: 2025,
       description: 'We are seeking passionate engineering graduates to join our product engineering teams. You will work on cutting-edge systems and cloud deployments.',
       requiredSkills: 'React, Node.js, SQL, Data Structures',
-      applicationStart: '2026-09-20',
-      applicationEnd: '2026-10-05',
+      applicationStart: defaultStartDate,
+      applicationEnd: defaultEndDate,
     },
   });
 
@@ -156,7 +159,7 @@ export const CreateJobDrive = () => {
           ? `${data.title} has been updated.`
           : `${data.title} for ${companyName} is now live!`,
       });
-      navigate('/admin/jobs');
+      navigate(isAdmin ? '/admin/jobs' : '/company/jobs');
     } catch (err) {
       showToast({
         type: 'error',
@@ -166,6 +169,20 @@ export const CreateJobDrive = () => {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const stepFields = {
+    1: isAdmin
+      ? ['companyId', 'title', 'location', 'jobType', 'salaryRange']
+      : ['title', 'location', 'jobType', 'salaryRange'],
+    2: ['minCgpa', 'maxBacklogs', 'eligibleBatch', 'allowedBranches'],
+    3: ['description', 'requiredSkills'],
+    4: ['applicationStart', 'applicationEnd'],
+  };
+
+  const goToNextStep = async () => {
+    const fields = stepFields[currentStep] || [];
+    if (await trigger(fields)) setCurrentStep(currentStep + 1);
   };
 
   const steps = [
@@ -180,7 +197,7 @@ export const CreateJobDrive = () => {
     <div className="max-w-3xl mx-auto space-y-6">
       <button
         type="button"
-        onClick={() => navigate('/admin/jobs')}
+        onClick={() => navigate(isAdmin ? '/admin/jobs' : '/company/jobs')}
         className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-indigo-600 transition-colors"
       >
         <ArrowLeft className="w-4 h-4" />
@@ -455,7 +472,7 @@ export const CreateJobDrive = () => {
               type="button"
               variant="primary"
               size="sm"
-              onClick={() => setCurrentStep(currentStep + 1)}
+              onClick={goToNextStep}
               rightIcon={ChevronRight}
             >
               Next Section

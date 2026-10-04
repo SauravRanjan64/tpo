@@ -10,8 +10,8 @@ export const LoginPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('student@dcrust.ac.in');
+  const [password, setPassword] = useState('Student@123');
   const [showPassword, setShowPassword] = useState(false);
   const [activeRole, setActiveRole] = useState('STUDENT');
   const [error, setError] = useState('');
@@ -22,9 +22,20 @@ export const LoginPage = () => {
     { key: 'ADMIN', label: 'T&P Admin' },
   ];
 
+  const demoAccounts = {
+    STUDENT: { email: 'student@dcrust.ac.in', password: 'Student@123' },
+    COMPANY: { email: 'recruiter@tcs.com', password: 'Recruiter@123' },
+    ADMIN: { email: 'admin@dcrust.edu.in', password: 'Admin@123' },
+  };
+
   const handleRoleChange = (role) => {
     setActiveRole(role);
     setError('');
+    const demo = demoAccounts[role];
+    if (demo) {
+      setEmail(demo.email);
+      setPassword(demo.password);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -110,7 +121,7 @@ export const LoginPage = () => {
               Sign In
             </h3>
             <p className="text-xs text-slate-500 mt-1">
-              Enter your official university email to access your dashboard.
+              Choose your role, then sign in with your official university email.
             </p>
           </div>
 

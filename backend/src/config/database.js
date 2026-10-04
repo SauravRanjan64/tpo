@@ -142,6 +142,7 @@ export const initialSeedData = {
       salaryMax: 1000000,
       minCgpa: 7.0,
       maxBacklogs: 0,
+      eligibleBatches: [2025],
       applicationStart: new Date('2026-01-01'),
       applicationEnd: new Date('2026-12-31'),
       status: 'ACTIVE',
@@ -934,7 +935,14 @@ class MongoStore {
   resource(type) {
     const model = this.models[type];
     return {
-      findUnique: async ({ where, include, includePasswordHash } = {}) => this.addRelations(type, await this.one(type, where, includePasswordHash), include),
+      findUnique: async ({ where, include, includePasswordHash } = {}) => {
+        const record = await this.one(type, where, includePasswordHash);
+        const related = await this.addRelations(type, record, include);
+        if (includePasswordHash && record?.passwordHash && related) {
+          related.passwordHash = record.passwordHash;
+        }
+        return related;
+      },
       findFirst: async ({ where = {}, include } = {}) => {
         const query = model.findOne(this.normaliseWhere(where)).sort({ createdAt: -1 });
         if (type !== 'user') query.select('-passwordHash');
@@ -1007,6 +1015,12 @@ class MongoStore {
   get resume() { return this.resource('resume'); } get resumeMatch() { return this.resource('resumeMatch'); }
   async $transaction(fn) {
     if (typeof fn !== 'function') return Promise.all(fn);
+    const topologyType = mongoose.connection?.topology?.description?.type;
+    const supportsTransactions = ['ReplicaSetWithPrimary', 'LoadBalanced', 'Sharded'].includes(topologyType);
+    // Standalone local MongoDB cannot run multi-document transactions.
+    if (!supportsTransactions) {
+      return fn(this);
+    }
     const session = await mongoose.startSession();
     try {
       let result;
